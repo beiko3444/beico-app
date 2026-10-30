@@ -167,15 +167,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상호</td>
                                     <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대표자</td>
                                     <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.representativeName || order.user.name}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주소</td>
                                     <td className="py-1 px-2 text-xs leading-tight font-bold">{order.user.partnerProfile?.address || '-'}</td>
                                 </tr>
                                 <tr>
@@ -207,7 +207,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상호</td>
                                     <td className="py-1 px-2 text-xs font-bold border-r border-black">주식회사 베이코</td>
                                     <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
                                         {/* Background text (underneath) */}
@@ -221,11 +221,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대표자</td>
                                     <td className="py-1 px-2 text-xs font-bold border-r border-black">이다빈</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주소</td>
                                     <td colSpan={2} className="py-1 px-2 text-xs leading-tight font-bold">부산시 강서구 낙동남로 1013번길 35</td>
                                 </tr>
                                 <tr>
@@ -247,12 +247,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         <thead className="bg-gray-100 border-b border-black">
                             <tr className="text-center font-bold text-[10px]">
                                 <th className="border-x border-black py-0.5 w-6">No</th>
-                                <th className="border-x border-black py-0.5 px-1">品名及び規格<br />품 명 및 규 격</th>
+                                <th className="border-x border-black py-0.5 px-1">品名及び規格<br />품명 및 규격</th>
                                 <th className="border-x border-black py-0.5 w-10">数量<br />수량</th>
-                                <th className="border-x border-black py-0.5 w-16">単価<br />단 가</th>
+                                <th className="border-x border-black py-0.5 w-16">単価<br />단가</th>
                                 <th className="border-x border-black py-0.5 w-20">供給価額<br />공급가액</th>
-                                <th className="border-x border-black py-0.5 w-16">税額<br />세 액</th>
-                                <th className="border-x border-black py-0.5 w-20 font-black">合計<br />합 계</th>
+                                <th className="border-x border-black py-0.5 w-16">税額<br />세액</th>
+                                <th className="border-x border-black py-0.5 w-20 font-black">合計<br />합계</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-300">
@@ -308,14 +308,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-gray-100 border-t-2 border-black font-bold text-center">
-                            <tr>
-                                <td colSpan={2} className="border-x border-black p-3 text-[11px]">合計 / 합계</td>
-                                <td className="border-x border-black p-3 font-inter">{totalQuantity.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 bg-gray-200">-</td>
-                                <td className="border-x border-black p-3 text-right font-inter">{supplyTotal.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 text-right font-inter">{taxTotal.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 text-right bg-gray-200 font-inter whitespace-nowrap">₩{grandTotal.toLocaleString()}</td>
+                        {/* Same size and side padding as the item rows, so totals end on the same right edge as the figures above. */}
+                        <tfoot className="bg-gray-100 border-t-2 border-black font-bold text-center text-[11px]">
+                            <tr className="h-8">
+                                <td colSpan={2} className="border-x border-black px-2 py-2">合計 / 합계</td>
+                                <td className="border-x border-black px-1 py-2 font-inter">{totalQuantity.toLocaleString()}</td>
+                                <td className="border-x border-black px-1 py-2 bg-gray-200">-</td>
+                                <td className="border-x border-black px-1 py-2 text-right font-inter">{supplyTotal.toLocaleString()}</td>
+                                <td className="border-x border-black px-1 py-2 text-right font-inter">{taxTotal.toLocaleString()}</td>
+                                <td className="border-x border-black px-1 py-2 text-right bg-gray-200 font-inter whitespace-nowrap">₩{grandTotal.toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>

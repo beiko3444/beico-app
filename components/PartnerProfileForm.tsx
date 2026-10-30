@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass } from '@/components/ui/field'
+import { themedSecondary } from '@/app/order/partner-ui'
 
 type Details = { name: string; contact: string; email: string; fax: string; address: string }
 
@@ -45,13 +47,14 @@ export default function PartnerProfileForm({ initial, isKorean }: { initial: Det
                     {field.label}
                     {field.key === 'name' ? <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span> : null}
                 </span>
-                <input className="ux-input h-12 text-base" type={field.type} autoComplete={field.auto} maxLength={field.max} required={field.key === 'name'} value={values[field.key]} onChange={event => { setValues({ ...values, [field.key]: event.target.value }); setMessage({ text: '', failed: false }) }} />
+                <input className={fieldClass('h-12 bg-[var(--input-bg)] text-base text-[var(--foreground)]')} type={field.type} autoComplete={field.auto} maxLength={field.max} required={field.key === 'name'} value={values[field.key]} onChange={event => { setValues({ ...values, [field.key]: event.target.value }); setMessage({ text: '', failed: false }) }} />
             </label>)}
         </fieldset>
         <p role="status" aria-live="polite" className={`mt-4 min-h-5 text-sm ${message.failed ? 'text-[var(--danger)]' : 'text-[var(--muted-foreground)]'}`}>{statusText}</p>
         <div className="mt-3 flex flex-wrap gap-3">
-            <button disabled={busy || !dirty} className={buttonClass('primary', 'md', 'min-h-11')} type="submit">{busy ? (isKorean ? '저장 중…' : '保存中…') : (isKorean ? '변경사항 저장' : '変更を保存')}</button>
-            <button disabled={busy || !dirty} type="button" className={buttonClass('secondary', 'md', 'min-h-11')} onClick={() => { setValues(saved); setMessage({ text: '', failed: false }) }}>{isKorean ? '변경 취소' : '変更を取り消す'}</button>
+            <button disabled={busy || !dirty} className={buttonClass('primary', 'md')} type="submit">{busy ? (isKorean ? '저장 중…' : '保存中…') : (isKorean ? '변경사항 저장' : '変更を保存')}</button>
+            {/* Only offered once there is something to undo; a faint disabled outline next to the grey save read as a second "off" style. */}
+            {dirty ? <button disabled={busy} type="button" className={buttonClass('secondary', 'md', themedSecondary)} onClick={() => { setValues(saved); setMessage({ text: '', failed: false }) }}>{isKorean ? '변경 취소' : '変更を取り消す'}</button> : null}
         </div>
     </form>
 }

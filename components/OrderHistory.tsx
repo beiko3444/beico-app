@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Copy, Download, FileText, Banknote, Info, Landmark, Package, PackageCheck, Truck } from 'lucide-react'
+import { Check, ChevronDown, Copy, Download, FileText, Banknote, Info, Landmark, Package, PackageCheck, Truck } from 'lucide-react'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
-import Badge, { type BadgeTone } from '@/components/ui/Badge'
+import Badge from '@/components/ui/Badge'
 import EmptyState from '@/components/ui/EmptyState'
 import { buttonClass } from '@/components/ui/buttonClass'
-import { PartnerPageHeader, ProductThumb } from '@/app/order/partner-ui'
+import { PartnerPageHeader, ProductThumb, themedGhost, themedSecondary } from '@/app/order/partner-ui'
+import { orderStatusMeta } from '@/lib/orderStatus'
+import { formatDateTime } from '@/lib/format'
 
 type OrderHistoryProduct = {
     name?: string | null
@@ -66,29 +68,10 @@ const safeNonNegativeInt = (value: unknown, fallback = 0) => {
 const formatNumber = (
     value: unknown,
     options?: Intl.NumberFormatOptions,
-) => safeNumber(value).toLocaleString(undefined, options)
+) => safeNumber(value).toLocaleString('ko-KR', options)
 
 const formatMoney = (value: unknown, isUSD: boolean) => {
     return formatNumber(value, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})
-}
-
-const formatOrderDate = (value: unknown, isKorean: boolean) => {
-    const date = value ? new Date(value as string | number | Date) : new Date()
-    const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
-    const locale = isKorean ? 'ko-KR' : 'ja-JP'
-    const datePart = safeDate.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
-    const dayPart = safeDate.toLocaleDateString(locale, { weekday: 'short' })
-    const timePart = safeDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
-    return `${datePart}(${dayPart}) ${timePart}`
-}
-
-const orderStatusBadge = (status: string, isKorean: boolean): { label: string; tone: BadgeTone } => {
-    if (status === 'PENDING' || status === 'PENDING_DEPOSIT') return { label: isKorean ? '입금 대기' : '入金待ち', tone: 'warning' }
-    if (status === 'DEPOSIT_COMPLETED') return { label: isKorean ? '배송 준비 중' : '発送準備中', tone: 'info' }
-    if (status === 'SHIPPED') return { label: isKorean ? '배송 중' : '配送中', tone: 'info' }
-    if (status === 'COMPLETED') return { label: isKorean ? '거래 완료' : '取引完了', tone: 'success' }
-    if (status === 'CANCELED') return { label: isKorean ? '주문 취소' : 'キャンセル済み', tone: 'neutral' }
-    return { label: isKorean ? '주문 접수' : '注文受付', tone: 'neutral' }
 }
 
 const courierName = (courier: string | null | undefined, isKorean: boolean) => (
@@ -101,6 +84,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
     const router = useRouter()
     const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
     const [copiedTracking, setCopiedTracking] = useState<string | null>(null)
+    const [openItemLists, setOpenItemLists] = useState<Record<string, boolean>>({})
     const safeOrders = Array.isArray(orders) ? orders : []
     const isKorean = userCountry === 'Korea'
 
@@ -116,7 +100,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                 <EmptyState
                     icon={<Package size={20} />}
                     title={isKorean ? '주문내역이 없습니다.' : '注文履歴がありません。'}
-                    action={<Link href="/order" className="ux-button-primary min-h-11 px-5">{isKorean ? '상품 주문하러 가기' : '商品を注文する'}</Link>}
+                    action={<Link href="/order" className={buttonClass('primary', 'md')}>{isKorean ? '상품 주문하러 가기' : '商品を注文する'}</Link>}
                 />
             </div>
         )
@@ -227,7 +211,14 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                     { label: '発送', icon: Truck },
                 ]
                 const progress = allStepsDone ? 100 : (activeStep / (steps.length - 1)) * 100
-                const badge = orderStatusBadge(status, isKorean)
+                const statusMeta = orderStatusMeta(status, trackingNumbers.length > 0)
+                const itemsOpen = Boolean(openItemLists[orderId])
+                const cancelLabel = isKorean ? '주문 취소' : '注文キャンセル'
+                const itemListTitle = <>
+                    <Package size={16} className="text-[var(--muted-foreground)]" aria-hidden />
+                    {isKorean ? '주문 상품 목록' : '注文商品リスト'}
+                    <span className="font-semibold text-[var(--muted-foreground)] tabular-nums">{items.length}</span>
+                </>
 
                 return (
                     <article key={orderId} className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:p-6">
@@ -235,14 +226,16 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                             <h2 className="whitespace-nowrap text-base font-bold tabular-nums">
                                 <span className="sr-only">{isKorean ? '주문번호' : '注文番号'} </span>{safeText(safeOrder.orderNumber) || orderId.slice(0, 12)}
                             </h2>
-                            <Badge tone={badge.tone}>{badge.label}</Badge>
-                            <p className="ml-auto whitespace-nowrap text-sm text-[var(--muted-foreground)] tabular-nums" suppressHydrationWarning>
-                                <span className="sr-only">{isKorean ? '주문일시' : '注文日時'} </span>{formatOrderDate(safeOrder.createdAt, isKorean)}
+                            <Badge tone={statusMeta.tone}>{isKorean ? statusMeta.label : statusMeta.labelJa}</Badge>
+                            {/* Phones: its own line under the number, left-aligned, instead of drifting to the far right of line two. */}
+                            <p className="basis-full whitespace-nowrap text-sm text-[var(--muted-foreground)] tabular-nums sm:ml-auto sm:basis-auto" suppressHydrationWarning>
+                                <span className="sr-only">{isKorean ? '주문일시' : '注文日時'} </span>{formatDateTime(safeOrder.createdAt)}
                             </p>
                         </header>
 
-                        {!isCanceled && (
-                            <div className="relative">
+                        {/* A finished order needs only its badge; the stepper is for orders still moving. Kept compact so the 4 steps read as one group. */}
+                        {!isCanceled && !isOrderCompleted && (
+                            <div className="relative md:max-w-2xl">
                                 {/* Runs between the first and last step centres (4 equal columns → 12.5% in from each side). */}
                                 <div aria-hidden className="absolute left-[12.5%] right-[12.5%] top-[18px] h-0.5 bg-[var(--border)]">
                                     <div className="h-full bg-slate-900 transition-all duration-500 dark:bg-slate-300" style={{ width: `${progress}%` }} />
@@ -272,7 +265,8 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                         )}
 
                         <div className="grid gap-5 md:grid-cols-2 md:gap-8">
-                            <section>
+                            {/* Bank details only while this order still waits for a deposit. */}
+                            {canRequestDeposit && <section>
                                 <h3 className="ux-section-title flex items-center gap-2">
                                     <Landmark size={16} className="text-[var(--muted-foreground)]" aria-hidden />
                                     {isKorean ? '입금 정보' : `お支払い情報${isUSD ? ' / Payment Info' : ''}`}
@@ -285,16 +279,17 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                     <dt className="text-[var(--muted-foreground)]">{isKorean ? '예금주' : `名義人${isUSD ? ' / Holder' : ''}`}</dt>
                                     <dd className="font-semibold">주식회사 베이코</dd>
                                 </dl>
-                            </section>
+                            </section>}
 
-                            <section>
-                                <div className="flex flex-wrap items-center justify-between gap-2 md:max-w-sm">
+                            {/* Right column, right edge: the total lines up with item amounts and the action row below. */}
+                            <section className="md:col-start-2 md:w-full md:max-w-sm md:justify-self-end">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <h3 className="ux-section-title">{isKorean ? '결제 금액' : `お支払い金額${isUSD ? ' / Amount' : ''}`}</h3>
                                     <Badge tone={safeOrder.taxInvoiceIssued ? 'success' : 'neutral'}>
                                         {isKorean ? '계산서' : '請求書'} {safeOrder.taxInvoiceIssued ? (isKorean ? '발급 완료' : '発行済み') : (isKorean ? '미발급' : '未発行')}
                                     </Badge>
                                 </div>
-                                <dl className="mt-3 space-y-1.5 text-sm md:max-w-sm">
+                                <dl className="mt-3 space-y-1.5 text-sm">
                                     <div className="flex justify-between gap-4 text-[var(--muted-foreground)]">
                                         <dt>{isKorean ? '공급가액' : `供給価額${isUSD ? ' / Supply Price' : ''}`}</dt>
                                         <dd className="tabular-nums">{money(supplyPrice)}</dd>
@@ -337,7 +332,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                         <div key={`${num}-${idx}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                             <span>{isKorean ? '송장번호' : '送り状番号'}{trackingNumbers.length > 1 ? ` ${idx + 1}` : ''}</span>
                                             <span className="font-mono text-sm text-[var(--foreground)]">{num}</span>
-                                            <button type="button" onClick={() => void copyTracking(num)} className={buttonClass('ghost', 'sm')}>
+                                            <button type="button" onClick={() => void copyTracking(num)} className={buttonClass('ghost', 'sm', themedGhost)}>
                                                 <Copy size={13} aria-hidden />
                                                 <span aria-live="polite">{copiedTracking === num ? (isKorean ? '복사됨' : 'コピー済み') : (isKorean ? '복사' : 'コピー')}</span>
                                             </button>
@@ -358,16 +353,16 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                     type="button"
                                     onClick={() => toggleDeposit(orderId, status)}
                                     disabled={loadingMap[orderId]}
-                                    className="ux-button-primary min-h-11 w-full px-5 text-sm disabled:opacity-60 sm:w-auto"
+                                    className={buttonClass('primary', 'md', 'w-full sm:w-auto')}
                                 >
                                     {loadingMap[orderId] ? (isKorean ? '처리 중…' : '処理中…') : (isKorean ? '입금 확인 요청' : '入金確認の要請')}
                                 </button>
                             )}
-                            <Link href={`/invoice/${orderId}`} target="_blank" className={buttonClass('secondary', 'md', 'min-h-11 flex-1 sm:flex-none')}>
+                            <Link href={`/invoice/${orderId}`} target="_blank" className={buttonClass('secondary', 'md', `flex-1 sm:flex-none ${themedSecondary}`)}>
                                 <FileText size={16} aria-hidden />
                                 {isKorean ? '거래명세표' : '取引明細書'}
                             </Link>
-                            <a href="/beiko_Business%20Registration%20Certificate.png" download="beiko_Business_Registration_Certificate.png" className={buttonClass('secondary', 'md', 'min-h-11 flex-1 sm:flex-none')}>
+                            <a href="/beiko_Business%20Registration%20Certificate.png" download="beiko_Business_Registration_Certificate.png" className={buttonClass('secondary', 'md', `flex-1 sm:flex-none ${themedSecondary}`)}>
                                 <Download size={16} aria-hidden />
                                 {isKorean ? '사업자등록증' : '事業者登録証'}
                             </a>
@@ -376,21 +371,33 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                     type="button"
                                     onClick={() => handleDelete(orderId)}
                                     disabled={loadingMap[orderId]}
-                                    className={buttonClass('danger', 'md', 'min-h-11 w-full sm:ml-auto sm:w-auto')}
+                                    className={buttonClass('danger', 'md', 'hidden sm:ml-auto sm:inline-flex')}
                                 >
-                                    {isKorean ? '주문 취소' : '注文キャンセル'}
+                                    {cancelLabel}
                                 </button>
                             )}
                         </div>
 
                         <section className="border-t border-[var(--border)] pt-5">
-                            <h3 className="ux-section-title flex items-center gap-2">
-                                <Package size={16} className="text-[var(--muted-foreground)]" aria-hidden />
-                                {isKorean ? '주문 상품 목록' : '注文商品リスト'}
-                                <span className="font-semibold text-[var(--muted-foreground)] tabular-nums">{items.length}</span>
+                            {/* Phones: the list starts folded to this one line, so a card stays about a screen long. */}
+                            <h3 className="ux-section-title">
+                                <button
+                                    type="button"
+                                    aria-expanded={itemsOpen}
+                                    aria-controls={`order-items-${orderId}`}
+                                    onClick={() => setOpenItemLists(prev => ({ ...prev, [orderId]: !prev[orderId] }))}
+                                    className="flex min-h-10 w-full items-center gap-2 text-left md:hidden"
+                                >
+                                    {itemListTitle}
+                                    <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-[var(--muted-foreground)]">
+                                        {itemsOpen ? (isKorean ? '접기' : '閉じる') : (isKorean ? '펼치기' : '表示')}
+                                        <ChevronDown size={16} aria-hidden className={`transition-transform ${itemsOpen ? 'rotate-180' : ''}`} />
+                                    </span>
+                                </button>
+                                <span className="hidden items-center gap-2 md:flex">{itemListTitle}</span>
                             </h3>
 
-                            <ul className="mt-2 divide-y divide-[var(--border)]">
+                            <ul id={`order-items-${orderId}`} className={`mt-2 divide-y divide-[var(--border)] ${itemsOpen ? '' : 'hidden'} md:block`}>
                                 {items.map((item, idx: number) => {
                                     const product = item?.product || null
                                     const itemId = safeText(item?.id) || `${orderId}-${idx}`
@@ -404,7 +411,8 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                     const productSubName = safeText(product?.nameEN) || safeText(product?.name) || (product ? productName : (isKorean ? '삭제되었거나 연결되지 않은 상품' : '削除または未接続の商品'))
 
                                     return (
-                                        <li key={itemId} className="flex gap-4 py-4">
+                                        // md+: thumbnail · details · unit price × qty · amount, so the two numbers sit side by side at the right.
+                                        <li key={itemId} className="flex gap-4 py-4 md:grid md:grid-cols-[80px_minmax(0,1fr)_160px_120px] md:items-center">
                                             <ProductThumb src={imageUrl || null} className="h-16 w-16 md:h-20 md:w-20" />
                                             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                                                 <h4 className="break-keep break-words text-sm font-bold leading-snug">{productName}</h4>
@@ -424,31 +432,47 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                                                         />
                                                     </div>
                                                 )}
-                                                <div className="mt-1 flex items-end justify-between gap-3">
+                                                <div className="mt-1 flex items-end justify-between gap-3 md:hidden">
                                                     <span className="text-sm text-[var(--muted-foreground)] tabular-nums">{money(price)} × {formatNumber(quantity)}{isKorean ? '개' : '個'}</span>
                                                     <span className="text-base font-semibold tabular-nums">{money(price * quantity)}</span>
                                                 </div>
                                             </div>
+                                            <span className="hidden text-right text-sm text-[var(--muted-foreground)] tabular-nums md:block">{money(price)} × {formatNumber(quantity)}{isKorean ? '개' : '個'}</span>
+                                            <span className="hidden text-right text-base font-semibold tabular-nums md:block">{money(price * quantity)}</span>
                                         </li>
                                     )
                                 })}
 
                                 {shippingFee > 0 && (
-                                    <li className="flex gap-4 py-4">
+                                    <li className="flex gap-4 py-4 md:grid md:grid-cols-[80px_minmax(0,1fr)_160px_120px] md:items-center">
                                         <div className="flex h-10 w-16 shrink-0 items-center justify-center text-[var(--muted-foreground)] md:w-20">
                                             <Truck size={20} aria-hidden />
                                         </div>
-                                        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 md:col-span-3 md:grid md:grid-cols-subgrid">
                                             <div>
                                                 <h4 className="text-sm font-bold">{isKorean ? '배송비' : '送料'}</h4>
-                                                <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{isKorean ? `100개당 3,000원 (총 ${totalQuantity}개)` : `100個ごとに3,000ウォン（合計 ${totalQuantity}個）`}</p>
+                                                <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{isKorean ? `100개당 3,000원 (총 ${formatNumber(totalQuantity)}개)` : `100個ごとに3,000ウォン（合計 ${formatNumber(totalQuantity)}個）`}</p>
                                             </div>
-                                            <span className="text-base font-semibold tabular-nums">{money(shippingFee)}</span>
+                                            <span className="text-base font-semibold tabular-nums md:col-start-3 md:text-right">{money(shippingFee)}</span>
                                         </div>
                                     </li>
                                 )}
                             </ul>
                         </section>
+
+                        {/* Phones: cancelling is irreversible and secondary, so it is a quiet text button at the very end, not a second full-width CTA. */}
+                        {!isOrderLocked && (
+                            <div className="flex justify-end sm:hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(orderId)}
+                                    disabled={loadingMap[orderId]}
+                                    className={buttonClass('dangerGhost', 'sm')}
+                                >
+                                    {cancelLabel}
+                                </button>
+                            </div>
+                        )}
                     </article>
                 )
             })}

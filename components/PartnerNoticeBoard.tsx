@@ -62,34 +62,25 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
           const date = formatNoticeDate(notice.updatedAt, isKorean)
           return (
             <details key={notice.id} className="group">
-              <summary className="grid cursor-pointer list-none gap-3 px-4 py-2.5 sm:grid-cols-[180px_minmax(0,1fr)_110px] sm:items-center sm:px-6 sm:py-3 lg:px-7 [&::-webkit-details-marker]:hidden">
-                <div className="hidden items-center gap-3 sm:flex">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone.iconWrap}`}>
-                    <Icon size={18} aria-hidden />
-                  </span>
-                  <p className="text-base font-bold text-[var(--foreground)]">{isKorean ? '공지사항' : 'お知らせ'}</p>
-                </div>
+              {/* Icon column + content: date and chevron follow the title itself, so the expand control sits by what it expands. */}
+              <summary className="grid cursor-pointer list-none gap-3 px-4 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-x-3 sm:px-6 sm:py-3 lg:px-7 [&::-webkit-details-marker]:hidden">
+                <span className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-full sm:flex ${tone.iconWrap}`}>
+                  <Icon size={18} aria-hidden />
+                </span>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Badge tone={tone.badge}>{isKorean ? tone.ko : tone.ja}</Badge>
-                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)] sm:whitespace-normal sm:break-words sm:text-base">{notice.title}</p>
-                    {/* On phones the notice is a one-line banner: date and chevron sit at the end of the title row. */}
-                    <time dateTime={notice.updatedAt} className="shrink-0 text-xs text-[var(--muted-foreground)] sm:hidden">{date}</time>
-                    <ChevronDown size={16} aria-hidden className="shrink-0 text-[var(--muted-foreground)] transition-transform group-open:rotate-180 sm:hidden" />
+                    {/* Only a notice that differs from the default gets a label. */}
+                    {notice.tone === 'IMPORTANT' || notice.tone === 'URGENT' ? <Badge tone={tone.badge}>{isKorean ? tone.ko : tone.ja}</Badge> : null}
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)] sm:flex-initial sm:whitespace-normal sm:break-words sm:text-base">{notice.title}</p>
+                    <time dateTime={notice.updatedAt} className="shrink-0 text-xs text-[var(--muted-foreground)] tabular-nums">{date}</time>
+                    <ChevronDown size={16} aria-hidden className="shrink-0 text-[var(--muted-foreground)] transition-transform group-open:rotate-180" />
+                    <span className="sr-only">{isKorean ? '자세히 보기' : '詳細を見る'}</span>
                   </div>
-                  <p className="mt-1.5 hidden whitespace-pre-wrap text-sm leading-6 text-[var(--muted-foreground)] sm:line-clamp-1">{notice.content}</p>
-                </div>
-
-                <div className="hidden flex-col items-end gap-1 text-sm sm:flex">
-                  <time dateTime={notice.updatedAt} className="text-xs text-[var(--muted-foreground)]">{date}</time>
-                  <span className="flex items-center gap-1 font-semibold text-[var(--foreground)]">
-                    {isKorean ? '자세히 보기' : '詳細を見る'}
-                    <ChevronDown size={15} aria-hidden className="transition-transform group-open:rotate-180" />
-                  </span>
+                  <p className="mt-1 hidden whitespace-pre-wrap text-sm leading-6 text-[var(--muted-foreground)] sm:line-clamp-1 group-open:sm:hidden">{notice.content}</p>
                 </div>
               </summary>
-              <div className={`mx-4 mb-4 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-base leading-7 text-[var(--foreground)] sm:ml-[216px] sm:mr-6 dark:border-[var(--border)] dark:bg-[var(--surface)] ${tone.panel}`}>
+              <div className={`mx-4 mb-4 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-base leading-7 text-[var(--foreground)] sm:ml-[72px] sm:mr-6 lg:ml-[76px] lg:mr-7 dark:border-[var(--border)] dark:bg-[var(--surface)] ${tone.panel}`}>
                 {notice.content}
               </div>
             </details>

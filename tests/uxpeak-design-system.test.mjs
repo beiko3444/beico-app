@@ -33,7 +33,9 @@ test('uses responsive navigation shells for admin and partner areas', () => {
 test('login has semantic fields, a real checkbox and recoverable errors', () => {
     const login = read('../app/login/page.tsx')
 
-    assert.match(login, /htmlFor="username"/)
+    // The label comes from AuthField (htmlFor={id}), shared with /signup.
+    assert.match(login, /AuthField id="username"/)
+    assert.match(read('../app/login/AuthShell.tsx'), /htmlFor=\{id\}/)
     assert.match(login, /autoComplete="username"/)
     assert.match(login, /autoComplete="current-password"/)
     assert.match(login, /type="checkbox"/)

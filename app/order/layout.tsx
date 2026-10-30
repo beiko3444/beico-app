@@ -7,7 +7,8 @@ import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
 import PartnerNoticeBoard, { type PartnerNoticeBoardItem } from '@/components/PartnerNoticeBoard'
 import { Languages, LogOut } from 'lucide-react'
-import { partnerCountryLabel } from './partner-ui'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { partnerCountryLabel, themedGhost } from './partner-ui'
 
 export default async function OrderLayout({
     children,
@@ -78,18 +79,20 @@ export default async function OrderLayout({
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-            <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--card)] shadow-[0_2px_10px_rgba(16,24,40,0.05)]">
-                <div className="mx-auto flex h-[72px] max-w-[1440px] items-center gap-3 px-3 sm:h-[78px] sm:px-5 lg:px-7">
-                    <Link href="/order" className="flex shrink-0 items-center no-underline" aria-label={isKorean ? '주문 홈' : '注文ホーム'}>
-                        <img src="/logo.png" alt="BEIKO BAIT" className="h-auto w-[68px] object-contain sm:w-[84px]" />
+            <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)] shadow-[0_2px_10px_rgba(16,24,40,0.05)]">
+                {/* Equal side columns keep the tabs on the page's centre line, the same axis as the content and the order bar. */}
+                <div className="mx-auto grid h-[72px] max-w-[1440px] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 px-3 sm:h-[78px] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:px-5 lg:px-7">
+                    <Link href="/order" className="flex shrink-0 items-center justify-self-start no-underline" aria-label={isKorean ? '주문 홈' : '注文ホーム'}>
+                        {/* Sized by height so the logo keeps clear space inside the bar. */}
+                        <img src="/logo.png" alt="BEIKO BAIT" className="h-12 w-auto object-contain sm:h-14" />
                     </Link>
 
-                    <div className="hidden min-w-0 flex-1 items-center justify-center sm:flex">
+                    <div className="hidden items-center justify-center sm:flex">
                         <UserNavbar isKorean={isKorean} />
                     </div>
 
-                    <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0">
-                        <div className="mr-1 min-w-0 text-right leading-tight">
+                    <div className="flex min-w-0 items-center justify-self-end gap-1">
+                        <div className="mr-2 min-w-0 text-right leading-tight">
                             <div className="max-w-[128px] truncate text-sm font-bold text-[var(--foreground)] sm:max-w-[170px]">{businessNameJP}</div>
                             {countryDisplay ? (
                                 <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">{countryDisplay}</div>
@@ -100,7 +103,7 @@ export default async function OrderLayout({
                             href="/translator"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ux-icon-button shrink-0 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                            className={buttonClass('ghost', 'iconMd', themedGhost)}
                             aria-label={isKorean ? '번역기 (새 탭)' : '翻訳ツール（新しいタブ）'}
                             title={isKorean ? '번역기' : '翻訳ツール'}
                         >
@@ -108,7 +111,7 @@ export default async function OrderLayout({
                         </a>
                         <LogoutButton
                             label={isKorean ? '로그아웃' : 'ログアウト'}
-                            className="h-10 rounded-lg border border-[var(--border-strong)] bg-[var(--card)] px-3 text-sm text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)] md:px-4"
+                            className={buttonClass('ghost', 'iconMd', `min-h-0 font-semibold md:w-auto md:px-3 md:text-sm ${themedGhost}`)}
                         >
                             <LogOut size={17} className="md:hidden" aria-hidden />
                             <span className="hidden md:inline">{isKorean ? '로그아웃' : 'ログアウト'}</span>

@@ -22,7 +22,9 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
     const navItems = isKorean ? KOREAN_NAV_ITEMS : JAPANESE_NAV_ITEMS
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-3 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label={isKorean ? '파트너 메뉴' : 'パートナーメニュー'}>
+        // Phones: a fixed 68px + safe-area bar, the height the order bar in order-interface.tsx sits on. While that bar
+        // is showing it carries the shadow, so the two read as one fixed block instead of two stacked layers.
+        <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(68px+env(safe-area-inset-bottom))] grid-cols-3 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] [body:has(#partner-order-bar)_&]:shadow-none sm:static sm:flex sm:h-auto sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label={isKorean ? '파트너 메뉴' : 'パートナーメニュー'}>
             {navItems.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
                 const Icon = item.icon

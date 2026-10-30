@@ -16,7 +16,7 @@ assert.match(orderInterfaceSource, /xl:grid-cols-3/)
 assert.match(orderInterfaceSource, /rounded-2xl/)
 assert.match(orderInterfaceSource, /soldOutOrderDisabled/)
 assert.match(noticeBoardSource, /formatNoticeDate/)
-assert.match(noticeBoardSource, /sm:grid-cols-\[180px_minmax\(0,1fr\)_110px\]/)
+assert.match(noticeBoardSource, /sm:grid-cols-\[auto_minmax\(0,1fr\)\]/)
 assert.match(layoutSource, /h-\[78px\]/)
 assert.match(navbarSource, /sm:min-w-\[118px\]/)
 

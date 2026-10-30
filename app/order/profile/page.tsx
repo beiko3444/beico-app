@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import ChangePasswordForm from '@/components/ChangePasswordForm'
 import PartnerProfileForm from '@/components/PartnerProfileForm'
 import { buttonClass } from '@/components/ui/buttonClass'
-import { PartnerPageHeader, partnerCountryLabel } from '../partner-ui'
+import { PartnerPageHeader, partnerCountryLabel, themedSecondary } from '../partner-ui'
 
 export default async function ProfilePage() {
     const session = await getServerSession(authOptions)
@@ -31,15 +31,14 @@ export default async function ProfilePage() {
         {user.role === 'PARTNER' && user.status === 'APPROVED' && <PartnerProfileForm isKorean={isKorean} initial={{
             name: user.name, contact: profile?.contact || '', email: profile?.email || '', fax: profile?.fax || '', address: profile?.address || '',
         }} />}
-        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                    <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
-                    <p className="break-keep text-sm leading-6 text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
-                </div>
-                <a href="mailto:contact@beiko.co.kr?subject=BEIKO%20partner%20information" className={buttonClass('secondary', 'md', 'min-h-11 self-start')}>{isKorean ? '사업자 정보 변경 문의' : '事業者情報の変更を問い合わせ'}</a>
+        {/* Desktop: the request link sits at the header's right. Phones: it moves after the data, so it doesn't split description from values. */}
+        <section className="flex flex-col gap-5 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-6 sm:p-7">
+            <div className="space-y-1">
+                <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
+                <p className="break-keep text-sm leading-6 text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
             </div>
-            <dl className="mt-5 grid gap-5 sm:grid-cols-2">
+            <a href="mailto:contact@beiko.co.kr?subject=BEIKO%20partner%20information" className={buttonClass('secondary', 'md', `order-last self-start sm:order-none ${themedSecondary}`)}>{isKorean ? '사업자 정보 변경 문의' : '事業者情報の変更を問い合わせ'}</a>
+            <dl className="grid gap-5 sm:col-span-2 sm:grid-cols-2">
                 {accountFields.map(([label, value]) => <div key={label}><dt className="text-sm text-[var(--muted-foreground)]">{label}</dt><dd className="mt-1 break-words text-base font-semibold">{value || '—'}</dd></div>)}
             </dl>
         </section>

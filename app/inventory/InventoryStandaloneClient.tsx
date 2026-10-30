@@ -1,6 +1,10 @@
 'use client'
 
 import Modal from '@/components/Modal'
+import Badge from '@/components/ui/Badge'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass } from '@/components/ui/field'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -9,6 +13,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ImageOff,
   PackagePlus,
   Plus,
   RefreshCw,
@@ -190,7 +195,7 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
   if (!src || failed) {
     return (
       <div className={`${sizeClass} ${frame} flex shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400`}>
-        <Boxes size={size === 'lg' ? 28 : 20} aria-hidden />
+        <ImageOff size={size === 'lg' ? 28 : 20} aria-hidden />
       </div>
     )
   }
@@ -362,25 +367,28 @@ export default function InventoryStandaloneClient() {
               onClick={() => {
                 void loadInbounds(selectedDate, true)
               }}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm"
+              className={buttonClass('secondary', 'iconMd', 'h-11 w-11')}
               aria-label="새로고침"
+              title="새로고침"
             >
-              <RefreshCw size={19} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={19} className={loading ? 'animate-spin' : ''} aria-hidden />
             </button>
           </div>
 
-          <div className="flex h-12 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20">
-            <Search size={20} className="shrink-0 text-slate-400" aria-hidden />
+          {/* The search filters the product cards only, so on desktop it stops where the card column ends (380px panel + 16px gap). */}
+          <div className="relative lg:mr-[396px]">
+            <Search size={20} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
             <input
+              type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="상품명 검색"
               aria-label="상품명 검색"
-              className="h-full min-w-0 flex-1 bg-transparent text-base font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:shadow-none"
+              className={fieldClass('h-12 pl-10 pr-11 text-base [&::-webkit-search-cancel-button]:hidden')}
             />
             {query && (
-              <button type="button" onClick={() => setQuery('')} className="text-slate-400" aria-label="검색 지우기">
-                <X size={20} />
+              <button type="button" onClick={() => setQuery('')} className={buttonClass('ghost', 'iconMd', 'absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400')} aria-label="검색 지우기">
+                <X size={20} aria-hidden />
               </button>
             )}
           </div>
@@ -474,10 +482,14 @@ function InboundTab({
                     <div className="line-clamp-2 min-h-[36px] break-keep text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:min-h-[44px] sm:text-base">{mainName}</div>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-slate-500">
-                      재고 <span className={`ml-1 text-lg font-black tabular-nums ${stockTone(stock)}`}>{formatNumber(stock)}</span>
-                      {stock <= 0 ? <span className="ml-1 text-xs text-amber-700">품절</span> : null}
-                    </span>
+                    {/* Kept below the product name in weight: the name is what people pick by. */}
+                    {stock <= 0 ? (
+                      <Badge tone="warning">품절</Badge>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-500">
+                        재고 <span className={`ml-1 text-base font-bold tabular-nums ${stockTone(stock)}`}>{formatNumber(stock)}</span>
+                      </span>
+                    )}
                     {/* The whole card opens the keypad; the chip says so. */}
                     <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-black text-slate-900">
                       <Plus size={13} strokeWidth={3} aria-hidden />
@@ -493,7 +505,7 @@ function InboundTab({
       </div>
 
       {/* On phones this comes first, collapsed to one line, so the result of an entry is visible without scrolling past every product. */}
-      <aside className="order-first rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:order-none lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
+      <aside className="order-first rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:self-start lg:top-[150px] lg:order-none lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
         <button
           type="button"
           onClick={() => setPanelOpen(open => !open)}
@@ -534,10 +546,11 @@ function InboundTab({
                     type="button"
                     onClick={() => onDeleteInbound(item.id)}
                     disabled={saving}
-                    className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-red-600 disabled:opacity-50"
+                    className={buttonClass('dangerGhost', 'iconMd')}
                     aria-label={`${item.productName} 입고 삭제`}
+                    title="입고 삭제"
                   >
-                    <Trash2 size={17} />
+                    <Trash2 size={17} aria-hidden />
                   </button>
                 </li>
               ))}
@@ -581,7 +594,7 @@ function InboundCalendar({
         <button
           type="button"
           onClick={() => moveMonth(-1)}
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-600"
+          className={buttonClass('secondary', 'sm')}
         >
           이전
         </button>
@@ -589,15 +602,16 @@ function InboundCalendar({
         <button
           type="button"
           onClick={() => moveMonth(1)}
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-600"
+          className={buttonClass('secondary', 'sm')}
         >
           다음
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
+      {/* Weekday heads start where the date numbers start (cells have p-1), so each column reads as one line. */}
+      <div className="grid grid-cols-7 gap-1 text-left text-[11px] font-black text-slate-400">
         {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-          <div key={day} className={`py-1 ${day === '일' ? 'text-red-500' : ''}`}>{day}</div>
+          <div key={day} className={`py-1 pl-1 ${day === '일' ? 'text-red-500' : ''}`}>{day}</div>
         ))}
       </div>
       <div className="mt-1 grid grid-cols-7 gap-1">
@@ -618,15 +632,14 @@ function InboundCalendar({
               title={holidayName || undefined}
               aria-label={`${dateText}${holidayName ? ` ${holidayName}` : ''}${item ? ` 입고 ${formatNumber(item.totalQuantity)}개` : ''}`}
               aria-pressed={active}
+              // Fill shows the day's state (holiday / has inbound / plain); selection only adds the ring on top.
               className={`min-h-[54px] rounded-md p-1 text-left transition ${
-                active
-                  ? 'bg-white text-slate-950 ring-2 ring-inset ring-slate-900'
-                  : holidayName
-                    ? 'bg-red-50 text-red-700'
+                holidayName
+                  ? 'bg-red-50 text-red-700'
                   : item
                     ? 'bg-emerald-50 text-slate-950'
                     : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-              } ${inCurrentMonth ? '' : 'opacity-40'}`}
+              } ${active ? 'ring-2 ring-inset ring-slate-900' : ''} ${inCurrentMonth ? '' : 'opacity-40'}`}
             >
               <div className="flex items-center justify-between gap-1">
                 <span className={`text-xs font-black ${holiday ? 'text-red-600' : ''}`}>{day.getDate()}</span>
@@ -678,13 +691,11 @@ function KeypadModal({
           <div className="flex min-w-0 items-center gap-3">
             <ProductImage src={product.imageUrl} alt={product.name} />
             <div className="min-w-0">
-              <div className="truncate text-lg font-black text-slate-950">{product.name}</div>
+              <div className="truncate text-lg font-extrabold text-slate-950">{product.name}</div>
               <div className="mt-1 text-xs font-bold text-slate-500">입고 수량 입력 · {inboundDate}</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="닫기" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-            <X size={20} />
-          </button>
+          <ModalCloseButton onClick={() => { if (!saving) onClose() }} className="shrink-0" />
         </div>
 
         <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-right text-4xl font-black tabular-nums text-slate-950">
@@ -715,7 +726,7 @@ function KeypadModal({
           type="button"
           onClick={onSubmit}
           disabled={saving || !value || Number(value) <= 0}
-          className="ux-button-primary mt-3 h-14 w-full text-lg font-black disabled:border-slate-300 disabled:bg-slate-300"
+          className={buttonClass('primary', 'md', 'mt-3 h-14 w-full text-lg')}
         >
           {saving ? <RefreshCw size={22} className="animate-spin" /> : <Check size={22} />}
           입력완료

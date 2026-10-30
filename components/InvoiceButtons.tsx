@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Download, Printer, X } from 'lucide-react'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { themedGhost, themedSecondary } from '@/app/order/partner-ui'
 
 interface InvoiceButtonsProps {
     orderNumber: string
@@ -84,15 +85,16 @@ export default function InvoiceButtons({ orderNumber, isKorean = true }: Invoice
     return (
         <div className="sticky top-0 z-40 mb-4 border-b border-[var(--border)] bg-[var(--card)] print:hidden">
             <div className="mx-auto flex max-w-[calc(210mm+48px)] items-center gap-2 px-3 py-2 sm:px-6 sm:py-3">
-                <button type="button" onClick={handleClose} className="ux-icon-button shrink-0" aria-label={t.close} title={t.close}>
-                    <X size={18} aria-hidden />
+                <button type="button" onClick={handleClose} className={buttonClass('ghost', 'iconMd', themedGhost)} aria-label={t.close} title={t.close}>
+                    <X size={20} aria-hidden />
                 </button>
-                <p className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--foreground)]">
-                    {t.title} <span className="font-normal text-[var(--muted-foreground)] tabular-nums">{orderNumber}</span>
+                {/* Phones show just the order number, the part that tells documents apart; the PNG button drops to its icon to make room. */}
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)] tabular-nums">
+                    <span className="hidden font-bold sm:inline">{t.title} </span><span className="sr-only sm:hidden">{t.title} </span>{orderNumber}
                 </p>
-                <button type="button" onClick={handleDownloadPNG} disabled={isDownloading} className={buttonClass('secondary', 'md')}>
+                <button type="button" onClick={handleDownloadPNG} disabled={isDownloading} aria-label={isDownloading ? t.saving : t.png} title={t.png} className={buttonClass('secondary', 'md', `w-10 px-0 sm:w-auto sm:px-4 ${themedSecondary}`)}>
                     <Download size={16} aria-hidden />
-                    {isDownloading ? t.saving : t.png}
+                    <span className="hidden sm:inline">{isDownloading ? t.saving : t.png}</span>
                 </button>
                 <button type="button" onClick={handlePrint} className={buttonClass('primary', 'md')}>
                     <Printer size={16} aria-hidden />

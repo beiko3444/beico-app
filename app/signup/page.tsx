@@ -1,11 +1,14 @@
 'use client'
 
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import {
     User, Lock, Building2, Mail, Phone, Printer, MapPin, Home, ArrowRight, Eye, EyeOff, Globe, ArrowLeft, Check, ChevronDown, Hash, FileUp
 } from 'lucide-react'
-import AuthShell, { useAuthLanguage, type AuthLanguage } from '../login/AuthShell'
+import AuthShell, { AuthField, authInput, authPrimaryClass, authSecondaryClass, useAuthLanguage, type AuthLanguage } from '../login/AuthShell'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { selectClass } from '@/components/ui/field'
+import { themedSecondary } from '@/app/order/partner-ui'
 
 // One language at a time, chosen with the switch in AuthShell (or by the country picked in step 1).
 const TRANSLATIONS = {
@@ -157,33 +160,6 @@ const COUNTRIES = [
 ]
 
 const countryLanguage = (country: string): AuthLanguage => country === 'Korea' ? 'ko' : country === 'Japan' ? 'ja' : 'en'
-
-const inputClass = 'ux-input h-12 pl-11 text-base'
-
-function Field({ id, label, required = false, hint, icon, after, children }: {
-    id: string
-    label: string
-    required?: boolean
-    hint?: string
-    icon: ReactNode
-    after?: ReactNode
-    children: ReactNode
-}) {
-    return (
-        <div className="space-y-1.5">
-            <label htmlFor={id} className="block text-sm font-semibold">
-                {label}
-                {required ? <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span> : null}
-            </label>
-            {hint ? <p id={`${id}-hint`} className="text-xs text-[var(--muted-foreground)]">{hint}</p> : null}
-            <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">{icon}</span>
-                {children}
-            </div>
-            {after}
-        </div>
-    )
-}
 
 export default function SignupPage() {
     const [language, setLanguage] = useAuthLanguage()
@@ -349,7 +325,7 @@ export default function SignupPage() {
                     <h2 className="text-xl font-bold">{t.successTitle}</h2>
                     <p className="text-sm leading-7 text-[var(--muted-foreground)]">{t.successMsg}</p>
                     <p className="ux-context">{t.successNote}</p>
-                    <Link href="/login" className="ux-button-primary min-h-12 w-full text-[15px]">{t.loginLink}</Link>
+                    <Link href="/login" className={authPrimaryClass}>{t.loginLink}</Link>
                 </section>
             ) : step === 1 ? (
                 <form onSubmit={handleNextStep} className="ux-panel space-y-5 p-5 sm:p-7">
@@ -374,7 +350,7 @@ export default function SignupPage() {
                                     if (e.target.value) setLanguage(countryLanguage(e.target.value), false)
                                 }}
                                 required
-                                className={`${inputClass} cursor-pointer appearance-none pr-11`}
+                                className={selectClass(Boolean(formData.country), `h-12 cursor-pointer appearance-none bg-[var(--input-bg)] pl-11 pr-11 text-base ${formData.country ? 'text-[var(--foreground)]' : ''}`)}
                             >
                                 <option value="" disabled>{t.countryPlaceholder}</option>
                                 {COUNTRIES.map(country => <option key={country.value} value={country.value}>{country.label}</option>)}
@@ -383,7 +359,7 @@ export default function SignupPage() {
                         </div>
                     </div>
 
-                    <button type="submit" className="ux-button-primary min-h-12 w-full text-[15px]">
+                    <button type="submit" className={authPrimaryClass}>
                         {t.nextButton}
                         <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
                     </button>
@@ -394,32 +370,32 @@ export default function SignupPage() {
                     <button
                         type="button"
                         onClick={() => setStep(1)}
-                        className="ux-button min-h-10 px-3 text-[var(--muted-foreground)]"
+                        className={buttonClass('secondary', 'md', `${themedSecondary} text-[var(--muted-foreground)]`)}
                     >
                         <ArrowLeft size={14} strokeWidth={2.5} aria-hidden />
                         {t.changeCountry} · {COUNTRIES.find(country => country.value === formData.country)?.label}
                     </button>
 
                     <fieldset className="space-y-5"><legend className="mb-4 text-base font-bold">{t.sectionLogin}</legend>
-                        <Field id="signup-username" label={t.userId} required icon={<User size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-username" label={t.userId} required icon={<User size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 id="signup-username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false}
                                 value={formData.username}
                                 onChange={handleChange}
                                 required
-                                className={inputClass}
+                                className={authInput()}
                             />
-                        </Field>
+                        </AuthField>
 
-                        <Field id="signup-password" label={t.password} required icon={<Lock size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-password" label={t.password} required icon={<Lock size={18} strokeWidth={1.5} />}>
                             <input
                                 type={showPassword ? "text" : "password"}
                                 id="signup-password" name="password" autoComplete="new-password"
                                 value={formData.password}
                                 onChange={handleChange}
                                 required
-                                className={`${inputClass} pr-12`}
+                                className={authInput('pr-12')}
                             />
                             <button
                                 type="button"
@@ -429,9 +405,9 @@ export default function SignupPage() {
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
-                        </Field>
+                        </AuthField>
 
-                        <Field
+                        <AuthField
                             id="signup-confirmPassword"
                             label={t.confirmPassword}
                             required
@@ -446,35 +422,35 @@ export default function SignupPage() {
                                 required
                                 aria-invalid={passwordMismatch}
                                 aria-describedby={passwordMismatch ? 'signup-confirmPassword-error' : undefined}
-                                className={`${inputClass} ${passwordMismatch ? 'border-[var(--danger)]' : ''}`}
+                                className={authInput(passwordMismatch ? 'border-[var(--danger)]' : '')}
                             />
-                        </Field>
+                        </AuthField>
                     </fieldset>
 
                     <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{t.sectionBusiness}</legend>
-                        <Field id="signup-businessName" label={t.companyName} required icon={<Building2 size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-businessName" label={t.companyName} required icon={<Building2 size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 id="signup-businessName" name="businessName" autoComplete="organization"
                                 value={formData.businessName}
                                 onChange={handleChange}
                                 required
-                                className={inputClass}
+                                className={authInput()}
                             />
-                        </Field>
+                        </AuthField>
 
-                        <Field id="signup-representativeName" label={t.contactPerson} required icon={<User size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-representativeName" label={t.contactPerson} required icon={<User size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 id="signup-representativeName" name="representativeName" autoComplete="name"
                                 value={formData.representativeName}
                                 onChange={handleChange}
                                 required
-                                className={inputClass}
+                                className={authInput()}
                             />
-                        </Field>
+                        </AuthField>
 
-                        <Field id="signup-businessRegNumber" label={t.registrationNumber} required icon={<Hash size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-businessRegNumber" label={t.registrationNumber} required icon={<Hash size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 inputMode="numeric"
@@ -482,10 +458,10 @@ export default function SignupPage() {
                                 value={formData.businessRegNumber}
                                 onChange={handleChange}
                                 required
-                                className={`${inputClass} tabular-nums`}
+                                className={authInput('tabular-nums')}
                                 placeholder={t.registrationPlaceholder}
                             />
-                        </Field>
+                        </AuthField>
 
                         <div className="space-y-1.5">
                             <label htmlFor="signup-document" className="block text-sm font-semibold">
@@ -513,7 +489,7 @@ export default function SignupPage() {
                     </fieldset>
 
                     <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{t.sectionContact}</legend>
-                        <Field id="signup-email" label={t.email} required hint={t.emailMemo} icon={<Mail size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-email" label={t.email} required hint={t.emailMemo} icon={<Mail size={18} strokeWidth={1.5} />}>
                             <input
                                 type="email"
                                 id="signup-email" name="email" autoComplete="email"
@@ -521,13 +497,13 @@ export default function SignupPage() {
                                 onChange={handleChange}
                                 required
                                 aria-describedby="signup-email-hint"
-                                className={inputClass}
+                                className={authInput()}
                                 placeholder="name@company.com"
                             />
-                        </Field>
+                        </AuthField>
 
                         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-3">
-                            <Field id="signup-contact" label={t.phone} required icon={<Phone size={18} strokeWidth={1.5} />}>
+                            <AuthField id="signup-contact" label={t.phone} required icon={<Phone size={18} strokeWidth={1.5} />}>
                                 <input
                                     type="tel"
                                     id="signup-contact" name="contact" autoComplete="tel"
@@ -535,23 +511,23 @@ export default function SignupPage() {
                                     onChange={handleChange}
                                     required
                                     maxLength={13}
-                                    className={`${inputClass} tabular-nums`}
+                                    className={authInput('tabular-nums')}
                                     placeholder={formData.country === 'Korea' ? '010-1234-5678' : formData.country === 'Japan' ? '03-1234-5678' : '+1 555 123 4567'}
                                 />
-                            </Field>
+                            </AuthField>
 
-                            <Field id="signup-fax" label={t.fax} icon={<Printer size={18} strokeWidth={1.5} />}>
+                            <AuthField id="signup-fax" label={t.fax} icon={<Printer size={18} strokeWidth={1.5} />}>
                                 <input
                                     type="tel"
                                     id="signup-fax" name="fax"
                                     value={formData.fax}
                                     onChange={handleChange}
-                                    className={`${inputClass} tabular-nums`}
+                                    className={authInput('tabular-nums')}
                                 />
-                            </Field>
+                            </AuthField>
                         </div>
 
-                        <Field id="signup-address" label={t.address1} required hint={t.address1Memo} icon={<MapPin size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-address" label={t.address1} required hint={t.address1Memo} icon={<MapPin size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 id="signup-address" name="address" autoComplete="street-address"
@@ -559,27 +535,27 @@ export default function SignupPage() {
                                 onChange={handleChange}
                                 required
                                 aria-describedby="signup-address-hint"
-                                className={inputClass}
+                                className={authInput()}
                                 placeholder={t.address1Placeholder}
                             />
-                        </Field>
+                        </AuthField>
 
-                        <Field id="signup-addressDetail" label={t.address2} icon={<Home size={18} strokeWidth={1.5} />}>
+                        <AuthField id="signup-addressDetail" label={t.address2} icon={<Home size={18} strokeWidth={1.5} />}>
                             <input
                                 type="text"
                                 id="signup-addressDetail" name="addressDetail"
                                 value={formData.addressDetail}
                                 onChange={handleChange}
-                                className={inputClass}
+                                className={authInput()}
                                 placeholder={t.address2Placeholder}
                             />
-                        </Field>
+                        </AuthField>
                     </fieldset>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="ux-button-primary min-h-12 w-full text-[15px] disabled:opacity-60"
+                        className={authPrimaryClass}
                     >
                         {loading ? t.processing : (
                             <>
@@ -594,7 +570,7 @@ export default function SignupPage() {
             {!submitted && (
                 <section className="mt-6 text-center">
                     <p className="text-sm text-[var(--muted-foreground)]">{t.loginText}</p>
-                    <Link href="/login" className="ux-button mt-3 min-h-12 w-full text-[15px]">{t.loginLink}</Link>
+                    <Link href="/login" className={`${authSecondaryClass} mt-3`}>{t.loginLink}</Link>
                 </section>
             )}
         </AuthShell>

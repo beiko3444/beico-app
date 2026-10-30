@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass } from '@/components/ui/field'
 
 export default function ChangePasswordForm({ isKorean = false }: { isKorean?: boolean }) {
     const [currentPassword, setCurrentPassword] = useState('')
@@ -50,7 +51,7 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
         }
     }
 
-    const inputClass = 'ux-input h-12 text-base'
+    const inputClass = fieldClass('h-12 bg-[var(--input-bg)] text-base text-[var(--foreground)]')
     const ready = Boolean(currentPassword && newPassword && confirmPassword)
 
     return (
@@ -122,7 +123,7 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
             <button
                 type="submit"
                 disabled={loading || !ready}
-                className={buttonClass('primary', 'md', 'min-h-11')}
+                className={buttonClass('primary', 'md')}
             >
                 {loading ? (isKorean ? '변경 중…' : '変更中…') : (isKorean ? '비밀번호 변경' : 'パスワードを変更')}
             </button>

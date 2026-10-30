@@ -7,7 +7,9 @@ import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight, Search, PackageSearch, ChevronDown, ListChecks, X } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/buttonClass'
-import { PartnerPageHeader, ProductThumb } from './partner-ui'
+import { fieldClass, selectClass } from '@/components/ui/field'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { PartnerPageHeader, ProductThumb, themedGhost, themedSecondary } from './partner-ui'
 import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 import { calculatePartnerOrderTotals } from '@/lib/partnerOrderPricing'
 
@@ -85,7 +87,7 @@ const safeText = (value: unknown, fallback = '') => {
 const formatNumber = (
     value: unknown,
     options?: Intl.NumberFormatOptions,
-) => safeNumber(value).toLocaleString(undefined, options)
+) => safeNumber(value).toLocaleString('ko-KR', options)
 
 const formatMoney = (value: unknown, isUSD: boolean) => {
     return formatNumber(value, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})
@@ -142,6 +144,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
         noResults: '검색 조건에 맞는 상품이 없습니다.',
         resultCount: '개 상품',
         selectedOnly: '선택 상품만',
+        editQuantities: '수량 수정',
         resetFilters: '검색 조건 초기화',
         productCode: '상품코드:',
         noImage: '이미지 없음',
@@ -160,6 +163,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
         minimumOrderSub: '최소 수량',
         orderUnit: '주문 단위',
         totalExcludingTax: '상품 합계 (부가세·배송비 별도)',
+        totalExcludingTaxShort: '합계 · VAT·배송비 별도',
         orderNow: '주문 내용 확인',
         summaryTitle: '주문 내용 확인',
         shipping: '배송비',
@@ -179,6 +183,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
         noResults: '検索条件に一致する商品がありません。',
         resultCount: '件',
         selectedOnly: '選択した商品のみ',
+        editQuantities: '数量を変更',
         resetFilters: '検索条件をリセット',
         productCode: '商品コード:',
         noImage: '画像なし',
@@ -197,6 +202,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
         minimumOrderSub: '最小数量',
         orderUnit: '注文単位',
         totalExcludingTax: '商品合計（税・送料別）',
+        totalExcludingTaxShort: '合計・税・送料別',
         orderNow: '注文内容を確認',
         summaryTitle: '注文内容の確認',
         shipping: '送料',
@@ -291,12 +297,34 @@ export default function OrderInterface({ products, isKorean = false }: { product
     const hasItems = productTotal > 0
     const selectedCount = safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).length
     const money = (value: unknown) => `${currencySymbol}${formatMoney(value, isUSD)}`
+    const filtersActive = Boolean(searchQuery) || statusFilter !== 'ALL' || showSelected
+    const resultMeta = <>
+        <span className="whitespace-nowrap text-sm text-[var(--muted-foreground)] tabular-nums">{filteredProducts.length.toLocaleString()}{copy.resultCount}</span>
+        {filtersActive ? (
+            <button
+                type="button"
+                onClick={() => {
+                    setSearchQuery('')
+                    setStatusFilter('ALL')
+                    setShowSelected(false)
+                }}
+                className={buttonClass('ghost', 'sm', themedGhost)}
+            >
+                <X size={14} aria-hidden />
+                {copy.resetFilters}
+            </button>
+        ) : null}
+    </>
+    const selectedProducts = safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0)
 
     return (
-        <div className="space-y-5 pb-36">
+        // Room for the fixed order bar only while it is showing.
+        <div className={`space-y-5 ${hasItems ? 'pb-20 sm:pb-24' : ''}`}>
             {orderError && !showSummary && <p role="alert" className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">{orderError}</p>}
             <PartnerPageHeader id="partner-product-list-title" title={copy.productList} description={copy.productListHelper}>
-                <div role="search" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2 lg:flex lg:w-auto">
+                <div role="search" className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-2 lg:flex lg:w-auto lg:items-center">
+                    {/* On desktop the result count sits at the start of the filter row it belongs to. */}
+                    <div className="hidden lg:mr-2 lg:flex lg:items-center lg:gap-1">{resultMeta}</div>
                     <label className="relative block min-w-0 lg:w-[340px]">
                         <span className="sr-only">{copy.searchPlaceholder}</span>
                         <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={19} aria-hidden />
@@ -305,52 +333,41 @@ export default function OrderInterface({ products, isKorean = false }: { product
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
                             placeholder={copy.searchPlaceholder}
-                            className="ux-input h-12 pl-11 pr-4 font-semibold"
+                            className={fieldClass('h-12 bg-[var(--input-bg)] pl-11 pr-4 text-sm text-[var(--foreground)]')}
                         />
                     </label>
                     <select
                         aria-label={isKorean ? '상품 상태 필터' : '商品状態フィルター'}
                         value={statusFilter}
                         onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'AVAILABLE' | 'SOLD_OUT')}
-                        className="ux-input h-12 w-auto min-w-[116px] font-semibold sm:min-w-[150px]"
+                        className={selectClass(true, 'h-12 w-auto min-w-[116px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] sm:min-w-[150px]')}
                     >
                         <option value="ALL">{copy.allProducts}</option>
                         <option value="AVAILABLE">{copy.availableOnly}</option>
                         <option value="SOLD_OUT">{copy.soldOutOnly}</option>
                     </select>
+                    {/* Icon-only below lg so a secondary filter is not the biggest control; the count floats as a badge,
+                        so the button keeps its width and the search box beside it never shifts when the cart fills. */}
                     <button
                         type="button"
                         aria-pressed={showSelected}
+                        aria-label={`${copy.selectedOnly}${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+                        title={copy.selectedOnly}
                         onClick={() => setShowSelected(value => !value)}
-                        className={`col-span-2 inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 text-sm font-semibold transition-colors lg:col-span-1 ${
+                        className={`relative inline-flex h-12 w-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border text-sm font-semibold transition-colors lg:w-auto lg:px-4 ${
                             showSelected
                                 ? 'border-brand-orange bg-brand-orange-soft text-brand-orange-strong'
                                 : 'border-[var(--border-strong)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--card-hover)]'
                         }`}
                     >
                         <ListChecks size={17} aria-hidden />
-                        {copy.selectedOnly}{selectedCount > 0 ? <span className="tabular-nums">({selectedCount})</span> : null}
+                        <span className="hidden lg:inline">{copy.selectedOnly}</span>
+                        {selectedCount > 0 ? <span aria-hidden className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-orange px-1.5 text-[11px] font-bold leading-none text-white tabular-nums">{selectedCount}</span> : null}
                     </button>
                 </div>
             </PartnerPageHeader>
 
-            <div className="flex min-h-10 items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-                <span className="text-sm text-[var(--muted-foreground)] tabular-nums">{filteredProducts.length.toLocaleString()}{copy.resultCount}</span>
-                {searchQuery || statusFilter !== 'ALL' || showSelected ? (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setSearchQuery('')
-                            setStatusFilter('ALL')
-                            setShowSelected(false)
-                        }}
-                        className={buttonClass('ghost', 'sm')}
-                    >
-                        <X size={14} aria-hidden />
-                        {copy.resetFilters}
-                    </button>
-                ) : null}
-            </div>
+            <div className="flex min-h-8 items-center justify-between gap-3 lg:hidden">{resultMeta}</div>
 
             {filteredProducts.length === 0 ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--card)] px-6 text-center">
@@ -402,7 +419,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                     </>}
                                 </div>
                                 <details className="group mt-1">
-                                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] [&::-webkit-details-marker]:hidden">
+                                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-start gap-1 text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] [&::-webkit-details-marker]:hidden">
                                         {isKorean ? '상품 자료·권장 판매가' : '商品情報・参考価格'}
                                         <ChevronDown size={16} aria-hidden className="transition-transform group-open:rotate-180" />
                                     </summary>
@@ -420,15 +437,19 @@ export default function OrderInterface({ products, isKorean = false }: { product
             )}
 
             {hasItems && (
-                <div className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-50 border-t border-[var(--border-strong)] bg-[var(--card)] shadow-[0_-8px_24px_rgba(16,24,40,0.12)] sm:bottom-0">
+                // On phones this sits flush on the bottom tabs (68px + safe area, see UserNavbar) and carries the one shadow,
+                // so bar and tabs read as one fixed block.
+                <div id="partner-order-bar" className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-40 border-t border-[var(--border-strong)] bg-[var(--card)] shadow-[0_-8px_24px_rgba(16,24,40,0.12)] sm:bottom-0">
                     {/* Same width and gutters as the page content in layout.tsx, so total and button line up with the cards. */}
                     <div className="mx-auto flex min-h-14 max-w-[1440px] items-center justify-between gap-3 px-3 py-2 sm:px-5 sm:py-4 lg:px-7">
                         <div className="min-w-0">
-                            <p className="truncate text-xs text-[var(--muted-foreground)] sm:text-sm">{copy.totalExcludingTax}</p>
+                            {/* Short label on phones so "별도" (excluded) is never cut off. */}
+                            <p className="text-xs leading-tight text-[var(--muted-foreground)] sm:hidden">{copy.totalExcludingTaxShort}</p>
+                            <p className="hidden text-sm text-[var(--muted-foreground)] sm:block">{copy.totalExcludingTax}</p>
                             <p className="text-xl font-bold leading-tight tabular-nums sm:text-2xl">{money(productTotal)}</p>
                         </div>
 
-                        <button type="button" onClick={handleOrderNow} className="ux-button-primary min-h-11 shrink-0 px-5 text-[15px]">
+                        <button type="button" onClick={handleOrderNow} className={buttonClass('primary', 'md', 'h-11 px-5 text-[15px]')}>
                             {copy.orderNow} <span className="tabular-nums">({selectedCount})</span>
                             <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
                         </button>
@@ -438,97 +459,99 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
             {
                 showSummary && (
-                    <Modal label={copy.summaryTitle} onClose={() => { if (!submittingRef.current) setShowSummary(false) }} className="flex items-center justify-center bg-black/60 p-4">
-                        <div className="relative w-full max-w-md overflow-y-auto rounded-2xl bg-[var(--card)] p-6 shadow-2xl">
-                            <button
-                                type="button"
-                                aria-label={isKorean ? '주문 확인 닫기' : '閉じる'} disabled={submitting}
-                                onClick={() => setShowSummary(false)}
-                                className="ux-icon-button absolute right-4 top-4 border-transparent text-[var(--muted-foreground)]"
-                            >
-                                <X size={18} aria-hidden />
-                            </button>
-
-                            <h3 className="mb-5 pr-12 text-2xl font-bold">{copy.summaryTitle}</h3>
-
-                            <button type="button" className={buttonClass('secondary', 'sm', 'mb-4')} disabled={submitting} onClick={() => { setShowSummary(false); setShowSelected(true); setSearchQuery(''); setStatusFilter('ALL') }}>{isKorean ? '선택 상품 수량 수정' : '選択商品の数量を変更'}</button>
-                            <div className="mb-5 max-h-[40vh] divide-y divide-[var(--border)] overflow-y-auto pr-2">
-                                {safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
-                                    <div key={p.id} className="flex items-center justify-between gap-3 py-3">
-                                        <div className="min-w-0">
-                                            <p className="break-keep text-sm font-bold">{displayProductName(p)}</p>
-                                            <p className="mt-0.5 text-sm text-[var(--muted-foreground)] tabular-nums">
-                                                {isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `数量 ${formatNumber(quantities[p.id])}個`}
-                                            </p>
-                                        </div>
-                                        <span className="shrink-0 text-right font-bold tabular-nums">{money(p.sellPrice * safeNonNegativeInt(quantities[p.id]))}</span>
-                                    </div>
-                                ))}
-                                {shippingFee > 0 && (
-                                    <div className="flex items-center justify-between gap-3 py-3">
-                                        <span className="text-sm font-bold text-[var(--muted-foreground)]">{copy.shipping}</span>
-                                        <span className="text-right font-bold tabular-nums">{money(shippingFee)}</span>
-                                    </div>
-                                )}
+                    <Modal label={copy.summaryTitle} onClose={() => { if (!submittingRef.current) setShowSummary(false) }} className="flex items-center justify-center bg-slate-950/50 p-4">
+                        <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-2xl bg-[var(--card)] shadow-2xl">
+                            <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
+                                <h3 className="text-lg font-extrabold">{copy.summaryTitle}</h3>
+                                <ModalCloseButton label={isKorean ? '주문 확인 닫기' : '閉じる'} onClick={() => { if (!submittingRef.current) setShowSummary(false) }} className={`-mr-2 -mt-1.5 ${themedGhost}`} />
                             </div>
 
-                            <dl className="mb-6 space-y-2 rounded-xl bg-[var(--surface)] p-5 text-sm">
-                                <div className="flex justify-between gap-3 text-[var(--muted-foreground)]">
-                                    <dt>{copy.supply}</dt>
-                                    <dd className="tabular-nums">{money(supplyTotal)}</dd>
+                            {/* Items and totals share one scroll area and one padding, so every amount ends on the same right edge. */}
+                            <div className="min-h-0 flex-1 overflow-y-auto px-6">
+                                <div className="divide-y divide-[var(--border)]">
+                                    {selectedProducts.map(p => (
+                                        <div key={p.id} className="flex items-center justify-between gap-3 py-3">
+                                            <div className="min-w-0">
+                                                <p className="break-keep text-sm font-bold">{displayProductName(p)}</p>
+                                                <p className="mt-0.5 text-sm text-[var(--muted-foreground)] tabular-nums">
+                                                    {isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `数量 ${formatNumber(quantities[p.id])}個`}
+                                                </p>
+                                            </div>
+                                            <span className="shrink-0 text-right font-bold tabular-nums">{money(p.sellPrice * safeNonNegativeInt(quantities[p.id]))}</span>
+                                        </div>
+                                    ))}
+                                    {shippingFee > 0 && (
+                                        <div className="flex items-center justify-between gap-3 py-3">
+                                            <span className="text-sm font-bold text-[var(--muted-foreground)]">{copy.shipping}</span>
+                                            <span className="text-right font-bold tabular-nums">{money(shippingFee)}</span>
+                                        </div>
+                                    )}
                                 </div>
-                                {!isUSD && (
+
+                                <dl className="space-y-2 border-t-2 border-[var(--border-strong)] py-4 text-sm">
                                     <div className="flex justify-between gap-3 text-[var(--muted-foreground)]">
-                                        <dt>{copy.tax}</dt>
-                                        <dd className="tabular-nums">{currencySymbol}{formatNumber(vat)}</dd>
+                                        <dt>{copy.supply}</dt>
+                                        <dd className="tabular-nums">{money(supplyTotal)}</dd>
                                     </div>
-                                )}
-                                <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-[var(--border)] pt-3">
-                                    <dt className="text-base font-bold">{copy.total}</dt>
-                                    <dd className="text-2xl font-bold tabular-nums">{money(totalAmount)}</dd>
+                                    {!isUSD && (
+                                        <div className="flex justify-between gap-3 text-[var(--muted-foreground)]">
+                                            <dt>{copy.tax}</dt>
+                                            <dd className="tabular-nums">{currencySymbol}{formatNumber(vat)}</dd>
+                                        </div>
+                                    )}
+                                    <div className="flex items-baseline justify-between gap-3 border-t border-[var(--border)] pt-3">
+                                        <dt className="text-base font-bold">{copy.total}</dt>
+                                        <dd className="text-2xl font-bold tabular-nums">{money(totalAmount)}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+
+                            <div className="border-t border-[var(--border)] px-6 pb-6 pt-4">
+                                {orderError && <p role="alert" className="mb-3 text-sm text-[var(--danger)]">{orderError}</p>}
+                                {/* Editing is the alternative to confirming, so the two sit side by side. */}
+                                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                                    <button type="button" className={buttonClass('secondary', 'md', `h-12 ${themedSecondary}`)} disabled={submitting} onClick={() => { setShowSummary(false); setShowSelected(true); setSearchQuery(''); setStatusFilter('ALL') }}>{copy.editQuantities}</button>
+                                    <button type="button" disabled={submitting} aria-busy={submitting}
+                                        onClick={async () => {
+                                            if (submittingRef.current) return
+                                            submittingRef.current = true
+                                            setSubmitting(true)
+                                            setOrderError('')
+                                            try {
+                                                const items = safeProducts
+                                                    .filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0)
+                                                    .map(p => ({
+                                                        productId: p.id,
+                                                        quantity: safeNonNegativeInt(quantities[p.id]),
+                                                        price: p.sellPrice
+                                                    }))
+
+                                                const res = await fetch('/api/orders', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ items, total: totalAmount })
+                                                })
+
+                                                if (res.ok) {
+
+                                                    setShowSummary(false);
+                                                    setQuantities({});
+                                                    router.push('/order/history');
+                                                } else {
+                                                    const errorData = await res.json();
+                                                    setOrderError(`${isKorean ? '주문 실패' : '注文に失敗しました'}: ${errorData.error}`);
+                                                }
+                                            } catch (e) {
+                                                console.error(e)
+                                                setOrderError(isKorean ? '주문 처리 중 오류가 발생했습니다. 다시 시도해 주세요.' : 'エラーが発生しました。再度お試しください。');
+                                            } finally { submittingRef.current = false; setSubmitting(false) }
+                                        }}
+                                        className={buttonClass('primary', 'md', 'h-12 text-base')}
+                                    >
+                                        {submitting ? (isKorean ? '주문 접수 중…' : '注文処理中…') : copy.confirmOrder}
+                                    </button>
                                 </div>
-                            </dl>
-
-                            {orderError && <p role="alert" className="mb-4 text-sm text-[var(--danger)]">{orderError}</p>}
-                            <button type="button" disabled={submitting} aria-busy={submitting}
-                                onClick={async () => {
-                                    if (submittingRef.current) return
-                                    submittingRef.current = true
-                                    setSubmitting(true)
-                                    setOrderError('')
-                                    try {
-                                        const items = safeProducts
-                                            .filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0)
-                                            .map(p => ({
-                                                productId: p.id,
-                                                quantity: safeNonNegativeInt(quantities[p.id]),
-                                                price: p.sellPrice
-                                            }))
-
-                                        const res = await fetch('/api/orders', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ items, total: totalAmount })
-                                        })
-
-                                        if (res.ok) {
-
-                                            setShowSummary(false);
-                                            setQuantities({});
-                                            router.push('/order/history');
-                                        } else {
-                                            const errorData = await res.json();
-                                            setOrderError(`${isKorean ? '주문 실패' : '注文に失敗しました'}: ${errorData.error}`);
-                                        }
-                                    } catch (e) {
-                                        console.error(e)
-                                        setOrderError(isKorean ? '주문 처리 중 오류가 발생했습니다. 다시 시도해 주세요.' : 'エラーが発生しました。再度お試しください。');
-                                    } finally { submittingRef.current = false; setSubmitting(false) }
-                                }}
-                                className="ux-button-primary min-h-12 w-full text-base disabled:opacity-60"
-                            >
-                                {submitting ? (isKorean ? '주문 접수 중…' : '注文処理中…') : copy.confirmOrder}
-                            </button>
+                            </div>
                         </div>
                     </Modal>
                 )}
