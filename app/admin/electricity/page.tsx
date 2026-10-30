@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import ElectricityClient from "./ElectricityClient"
 
+export const metadata = { title: '전력 관리' }
+
 export const dynamic = 'force-dynamic'
 
 export default async function ElectricityPage() {

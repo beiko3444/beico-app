@@ -2,10 +2,12 @@
 
 import { buttonClass } from '@/components/ui/buttonClass'
 import EmptyState from '@/components/ui/EmptyState'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass } from '@/components/ui/field'
 import Modal from '@/components/Modal'
 import { useState, useTransition, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Circle, Plus, Trash2, Trophy, X } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Circle, Plus, Trash2, Trophy } from 'lucide-react'
 import { createTask, updateTask, toggleTask, deleteTask } from '@/app/admin/tasks/actions'
 import { getKoreanHolidayName } from '@/lib/koreanHolidays'
 import { createPortal } from 'react-dom'
@@ -210,7 +212,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                 </div>
                 <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                        className="h-full rounded-full bg-brand-orange transition-all duration-500"
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                         style={{ width: `${taskLevel.progressPercent}%` }}
                     />
                 </div>
@@ -240,7 +242,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
                 <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
                     {WEEKDAY_LABELS.map((day, idx) => (
-                        <div key={day} className={`py-2.5 text-center text-xs font-bold ${isWeekendDay(idx) ? 'text-red-500' : 'text-slate-500'}`}>
+                        <div key={day} className={`py-2.5 text-center text-xs font-bold ${isWeekendDay(idx) ? 'text-red-600' : 'text-slate-500'}`}>
                             {day}
                         </div>
                     ))}
@@ -268,7 +270,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                     openNewTask()
                                 }}
                                 onClick={() => setSelectedDate(date)}
-                                className={`group relative flex min-h-[100px] flex-col border-b border-r border-slate-100 p-1.5 transition-colors
+                                className={`group relative flex min-h-[100px] flex-col border-b border-r border-slate-100 p-1.5 transition-colors sm:p-2
                                     ${current ? (isWeekend ? 'bg-slate-50/70' : 'bg-white') : 'bg-slate-50/40'}
                                     ${isSelected ? 'ring-2 ring-inset ring-slate-900/15' : 'hover:bg-slate-50'}
                                 `}
@@ -336,7 +338,8 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                     type="button"
                                     onClick={() => handleDeleteTask(task.id)}
                                     aria-label="업무 삭제"
-                                    className="text-slate-300 opacity-0 transition-opacity hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100"
+                                    title="업무 삭제"
+                                    className={buttonClass('dangerGhost', 'icon', 'transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100')}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
@@ -365,29 +368,34 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
             )}
 
             {isModalOpen && (
-                <Modal labelledBy="task-modal-title" onClose={closeModal} className="bg-slate-950/45">
-                    <div className="flex h-full items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}>
-                        <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-                            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <Modal labelledBy="task-modal-title" onClose={closeModal} className="bg-slate-950/50">
+                    <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}>
+                        <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+                            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
                                 <div>
-                                    <h3 id="task-modal-title" className="text-base font-black text-slate-900">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
+                                    <h3 id="task-modal-title" className="text-[18px] font-extrabold text-slate-900">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
                                     {!editingTask && <p className="mt-0.5 text-xs font-medium text-slate-500">{selectedDate.getFullYear()}년 {selectedDateLabel}</p>}
                                 </div>
-                                <button type="button" onClick={closeModal} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}><X className="h-4 w-4" /></button>
+                                <ModalCloseButton onClick={closeModal} className="-mr-2 -mt-1" />
                             </div>
-                            <form action={handleSaveTask} className="space-y-4 p-5">
-                                <input type="hidden" name="date" value={selectedDate.toISOString()} />
-                                <label className="block space-y-1">
-                                    <span className="text-xs font-bold text-slate-500">업무 제목</span>
-                                    <input name="title" required autoFocus defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15" />
-                                </label>
-                                <label className="block space-y-1">
-                                    <span className="text-xs font-bold text-slate-500">상세 내용</span>
-                                    <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요" className="min-h-[100px] w-full resize-none rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15" />
-                                </label>
-                                <button type="submit" disabled={isPending} className={buttonClass('primary', 'md', 'w-full')}>
-                                    {isPending ? '저장 중...' : '일정 저장하기'}
-                                </button>
+                            <form action={handleSaveTask} className="flex min-h-0 flex-1 flex-col">
+                                <div className="space-y-4 overflow-y-auto p-5">
+                                    <input type="hidden" name="date" value={selectedDate.toISOString()} />
+                                    <label className="block">
+                                        <span className={labelClass}>업무 제목</span>
+                                        <input name="title" required autoFocus defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className={fieldClass()} />
+                                    </label>
+                                    <label className="block">
+                                        <span className={labelClass}>상세 내용</span>
+                                        <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요" className={fieldClass('h-auto min-h-[100px] resize-none py-2.5')} />
+                                    </label>
+                                </div>
+                                <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+                                    <button type="button" onClick={closeModal} className={buttonClass('secondary', 'md')}>취소</button>
+                                    <button type="submit" disabled={isPending} className={buttonClass('primary', 'md')}>
+                                        {isPending ? '저장 중...' : editingTask ? '변경 저장' : '업무 저장'}
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>

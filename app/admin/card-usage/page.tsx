@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import CardUsageClient from './CardUsageClient'
 
+export const metadata = { title: '카드 사용내역' }
+
 export const dynamic = 'force-dynamic'
 
 export default async function CardUsagePage() {

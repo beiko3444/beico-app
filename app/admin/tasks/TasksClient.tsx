@@ -10,6 +10,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass, labelClass } from '@/components/ui/field'
 
 type AttendanceRecord = {
     id: string
@@ -176,7 +177,41 @@ export default function TasksClient({
         setEmployeeForm(previous => previous === form ? null : form)
     }
 
-    const inputClass = 'mt-1 h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15'
+    // A handful of employees fits in a chip row above the calendar, so the calendar can take the full width.
+    const useEmployeeList = employees.length > 4
+    const monthHolidays = calendarDays.flatMap(date => {
+        const name = date ? getKoreanHolidayName(dateKey(date)) : null
+        return date && name ? [`${date.getDate()}일 ${name}`] : []
+    })
+
+    const employeeFormPanel = employeeForm === 'create' ? (
+        <form action={handleCreateEmployee} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-black text-slate-900">새 직원</p>
+            <AttendanceInputs />
+            <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setEmployeeForm(null)} className={buttonClass('secondary', 'md')}>취소</button>
+                <button disabled={isPending} className={buttonClass('primary', 'md')}>직원 추가</button>
+            </div>
+        </form>
+    ) : employeeForm === 'edit' && selectedEmployee ? (
+        <form key={selectedEmployee.id} action={handleUpdateEmployee} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-black text-slate-900">{selectedEmployee.name} 근로 조건</p>
+            <AttendanceInputs employee={selectedEmployee} />
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={handleDeleteEmployee}
+                    disabled={isPending}
+                    className={buttonClass('dangerGhost', 'md', 'mr-auto px-3')}
+                >
+                    <Trash2 className="h-4 w-4" />
+                    직원 삭제
+                </button>
+                <button type="button" onClick={() => setEmployeeForm(null)} className={buttonClass('secondary', 'md')}>취소</button>
+                <button disabled={isPending} className={buttonClass('primary', 'md')}>설정 저장</button>
+            </div>
+        </form>
+    ) : null
 
     return (
         <div className="font-sans">
@@ -196,46 +231,55 @@ export default function TasksClient({
             </div>
 
             <div role="tabpanel" aria-label="근태·급여" hidden={activeView !== 'attendance'} className="mt-4">
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start xl:gap-6">
-                    {/* On phones the calendar is the main task, so employees become a chip row above it. */}
-                    {employees.length > 0 && (
-                        <div role="group" aria-label="직원 선택" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 xl:hidden">
+                <div className={`grid grid-cols-1 gap-4 ${useEmployeeList ? 'xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start xl:gap-6' : ''}`}>
+                    <div className="flex min-w-0 flex-col gap-3">
+                        {/* The selected employee, its edit button and "add" sit together; the form opens right below. */}
+                        <div role="group" aria-label="직원 선택" className={`-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 ${useEmployeeList ? 'xl:hidden' : ''}`}>
                             {employees.map(employee => {
                                 const selected = employee.id === selectedEmployee?.id
                                 return (
-                                    <button
-                                        key={employee.id}
-                                        type="button"
-                                        aria-pressed={selected}
-                                        onClick={() => setSelectedEmployeeId(employee.id)}
-                                        className={`inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-sm font-bold transition-colors ${selected ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
-                                    >
-                                        {employee.name}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-
-                    <aside className={employees.length > 0 ? 'order-last xl:order-none' : ''}>
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
-                                <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                                    직원
-                                    <span className="text-xs font-bold tabular-nums text-slate-400">{employees.length}</span>
-                                </h2>
-                                <div className="flex items-center gap-1">
-                                    {selectedEmployee && (
+                                    <React.Fragment key={employee.id}>
                                         <button
                                             type="button"
-                                            onClick={() => toggleEmployeeForm('edit')}
-                                            aria-expanded={employeeForm === 'edit'}
-                                            className={buttonClass('ghost', 'sm', 'xl:hidden')}
+                                            aria-pressed={selected}
+                                            onClick={() => setSelectedEmployeeId(employee.id)}
+                                            className={`inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-sm font-bold transition-colors ${selected ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                            {selectedEmployee.name} 수정
+                                            {employee.name}
                                         </button>
-                                    )}
+                                        {selected && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleEmployeeForm('edit')}
+                                                aria-expanded={employeeForm === 'edit'}
+                                                aria-label={`${employee.name} 근로 조건 수정`}
+                                                title="근로 조건 수정"
+                                                className={buttonClass('secondary', 'iconMd', `rounded-full ${employeeForm === 'edit' ? 'border-slate-900 text-slate-900' : ''}`)}
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </React.Fragment>
+                                )
+                            })}
+                            <button
+                                type="button"
+                                onClick={() => toggleEmployeeForm('create')}
+                                aria-expanded={employeeForm === 'create'}
+                                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-dashed border-slate-300 bg-white px-3.5 text-sm font-bold text-slate-600 transition-colors hover:border-slate-500 hover:text-slate-900"
+                            >
+                                <Plus className="h-4 w-4" />
+                                직원 추가
+                            </button>
+                        </div>
+
+                        {useEmployeeList && (
+                            <aside className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:block">
+                                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+                                    <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                                        직원
+                                        <span className="text-xs font-bold tabular-nums text-slate-500">{employees.length}</span>
+                                    </h2>
                                     <button
                                         type="button"
                                         onClick={() => toggleEmployeeForm('create')}
@@ -246,81 +290,55 @@ export default function TasksClient({
                                         추가
                                     </button>
                                 </div>
-                            </div>
-
-                            <div className={`space-y-2 p-3 ${employees.length > 0 ? 'hidden xl:block' : ''}`}>
-                                {employees.length > 0 ? employees.map(employee => {
-                                    const selected = employee.id === selectedEmployee?.id
-                                    const editing = selected && employeeForm === 'edit'
-                                    return (
-                                        <div
-                                            key={employee.id}
-                                            className={`flex items-center rounded-xl border transition-colors ${selected ? 'border-slate-900 bg-slate-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
-                                        >
-                                            <button
-                                                type="button"
-                                                aria-pressed={selected}
-                                                onClick={() => setSelectedEmployeeId(employee.id)}
-                                                className="min-w-0 flex-1 px-4 py-3 text-left"
+                                <div className="space-y-1 p-2">
+                                    {employees.map(employee => {
+                                        const selected = employee.id === selectedEmployee?.id
+                                        const editing = selected && employeeForm === 'edit'
+                                        return (
+                                            <div
+                                                key={employee.id}
+                                                className={`flex items-center rounded-lg transition-colors ${selected ? 'bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)]' : 'hover:bg-slate-50'}`}
                                             >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="truncate font-black text-slate-900">{employee.name}</span>
-                                                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{formatMoney(employee.hourlyWage)}/h</span>
-                                                </div>
-                                                <div className="mt-1 text-xs font-medium text-slate-500">1일 {employee.dailyHours}시간</div>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-label={`${employee.name} 근로 조건 수정`}
-                                                title="근로 조건 수정"
-                                                aria-expanded={editing}
-                                                onClick={() => {
-                                                    setSelectedEmployeeId(employee.id)
-                                                    setEmployeeForm(editing ? null : 'edit')
-                                                }}
-                                                className={`mr-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white hover:text-slate-900 ${editing ? 'bg-white text-slate-900' : 'text-slate-400'}`}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    )
-                                }) : (
-                                    <EmptyState bare compact icon={<UserRound size={20} />} title="등록된 직원이 없습니다" description="[추가]를 눌러 첫 직원을 등록하세요." />
-                                )}
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    onClick={() => setSelectedEmployeeId(employee.id)}
+                                                    className="min-w-0 flex-1 px-4 py-3 text-left"
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className={`truncate font-black ${selected ? 'text-brand-orange-strong' : 'text-slate-900'}`}>{employee.name}</span>
+                                                        <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{formatMoney(employee.hourlyWage)}/h</span>
+                                                    </div>
+                                                    <div className="mt-1 text-xs font-medium text-slate-500">1일 {employee.dailyHours}시간</div>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`${employee.name} 근로 조건 수정`}
+                                                    title="근로 조건 수정"
+                                                    aria-expanded={editing}
+                                                    onClick={() => {
+                                                        setSelectedEmployeeId(employee.id)
+                                                        setEmployeeForm(editing ? null : 'edit')
+                                                    }}
+                                                    className={buttonClass('ghost', 'iconMd', `mr-2 ${editing ? 'bg-white text-slate-900' : 'text-slate-500 hover:bg-white hover:text-slate-900'}`)}
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </aside>
+                        )}
+
+                        {employeeFormPanel}
+
+                        {employees.length === 0 && !employeeForm && (
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                <EmptyState bare compact icon={<UserRound size={20} />} title="등록된 직원이 없습니다" description="[직원 추가]를 눌러 첫 직원을 등록하세요." />
                             </div>
-
-                            {employeeForm === 'create' && (
-                                <form action={handleCreateEmployee} className="space-y-4 border-t border-slate-100 p-5">
-                                    <p className="text-xs font-bold text-slate-500">새 직원</p>
-                                    <AttendanceInputs inputClass={inputClass} />
-                                    <div className="flex gap-2">
-                                        <button disabled={isPending} className={buttonClass('primary', 'md', 'flex-1')}>직원 추가</button>
-                                        <button type="button" onClick={() => setEmployeeForm(null)} className={buttonClass('secondary', 'md')}>취소</button>
-                                    </div>
-                                </form>
-                            )}
-
-                            {employeeForm === 'edit' && selectedEmployee && (
-                                <form key={selectedEmployee.id} action={handleUpdateEmployee} className="space-y-4 border-t border-slate-100 p-5">
-                                    <p className="text-xs font-bold text-slate-500">{selectedEmployee.name} 근로 조건</p>
-                                    <AttendanceInputs employee={selectedEmployee} inputClass={inputClass} />
-                                    <div className="flex gap-2">
-                                        <button disabled={isPending} className={buttonClass('primary', 'md', 'flex-1')}>설정 저장</button>
-                                        <button
-                                            type="button"
-                                            onClick={handleDeleteEmployee}
-                                            disabled={isPending}
-                                            className={buttonClass('danger', 'md', 'w-10 px-0')}
-                                            aria-label="직원 삭제"
-                                            title="직원 삭제"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-                        </div>
-                    </aside>
+                        )}
+                    </div>
 
                     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
@@ -336,7 +354,7 @@ export default function TasksClient({
 
                         <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
                             {WEEKDAY_LABELS.map((day, idx) => (
-                                <div key={day} className={`py-2.5 text-center text-xs font-bold ${isWeekendDay(idx) ? 'text-red-500' : 'text-slate-500'}`}>
+                                <div key={day} className={`py-2.5 text-center text-xs font-bold ${isWeekendDay(idx) ? 'text-red-600' : 'text-slate-500'}`}>
                                     {day}
                                 </div>
                             ))}
@@ -344,7 +362,7 @@ export default function TasksClient({
 
                         <div className="grid grid-cols-7">
                             {calendarDays.map((date, index) => {
-                                if (!date) return <div key={`blank-${index}`} className="min-h-[72px] border-b border-r border-slate-100 bg-slate-50/40 sm:min-h-[112px]" />
+                                if (!date) return <div key={`blank-${index}`} className="min-h-[72px] border-b border-r border-slate-100 bg-slate-50/40 sm:min-h-[100px]" />
 
                                 const key = dateKey(date)
                                 const checked = selectedWorkDates.has(key)
@@ -359,7 +377,7 @@ export default function TasksClient({
                                         disabled={!selectedEmployee || isPending}
                                         aria-pressed={checked}
                                         aria-label={`${date.getMonth() + 1}월 ${date.getDate()}일${holidayName ? ` ${holidayName}` : ''}, ${checked ? '근무일' : '미등록'}`}
-                                        className={`min-h-[72px] border-b border-r p-1.5 text-left transition-colors disabled:cursor-not-allowed sm:min-h-[112px] sm:p-3 ${
+                                        className={`flex min-h-[72px] flex-col items-stretch justify-start gap-1.5 border-b border-r p-1.5 text-left transition-colors disabled:cursor-not-allowed sm:min-h-[100px] sm:p-2 ${
                                             checked
                                                 ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
                                                 : holidayName
@@ -369,22 +387,23 @@ export default function TasksClient({
                                                         : 'border-slate-100 bg-white hover:bg-slate-50'
                                         }`}
                                     >
-                                        <div className="flex flex-col items-start gap-1 sm:flex-row sm:justify-between sm:gap-2">
-                                            <span className={`text-sm font-black tabular-nums ${holidayName || isWeekend ? 'text-red-600' : 'text-slate-700'}`}>{date.getDate()}</span>
-                                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border sm:h-5 sm:w-5 ${checked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white'}`}>
+                                        {/* Number and check stay pinned to the top; extra lines never shift them. */}
+                                        <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                                            <span className={`inline-flex h-6 min-w-6 items-center justify-center px-1 text-sm font-black tabular-nums ${holidayName || isWeekend ? 'text-red-600' : 'text-slate-700'}`}>{date.getDate()}</span>
+                                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border sm:h-5 sm:w-5 ${checked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white'}`}>
                                                 {checked && <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" strokeWidth={3.5} />}
                                             </span>
                                         </div>
                                         {holidayName && (
                                             <>
-                                                <span aria-hidden="true" className="mt-1.5 block h-1.5 w-1.5 rounded-full bg-red-500 sm:hidden" />
-                                                <span className="mt-2 hidden max-w-full rounded-md bg-red-100 px-2 py-1 text-[11px] font-bold leading-none text-red-700 sm:inline-flex">
+                                                <span aria-hidden="true" className="block h-1.5 w-1.5 rounded-full bg-red-500 sm:hidden" />
+                                                <span className="hidden max-w-full self-start rounded-md bg-red-100 px-2 py-1 text-[11px] font-bold leading-none text-red-700 sm:inline-flex">
                                                     <span className="truncate">{holidayName}</span>
                                                 </span>
                                             </>
                                         )}
                                         {checked && selectedEmployee && (
-                                            <div className="mt-2 hidden rounded-lg bg-white/80 px-2 py-1 text-[11px] font-bold tabular-nums text-emerald-700 sm:block">
+                                            <div className="mt-auto hidden rounded-lg bg-white/80 px-2 py-1 text-[11px] font-bold tabular-nums text-emerald-700 sm:block">
                                                 {selectedEmployee.dailyHours}h · {formatMoney(selectedEmployee.hourlyWage * selectedEmployee.dailyHours)}
                                             </div>
                                         )}
@@ -393,6 +412,11 @@ export default function TasksClient({
                             })}
                         </div>
 
+                        {monthHolidays.length > 0 && (
+                            <p className="break-keep border-b border-slate-100 px-4 py-2 text-xs text-slate-500 sm:hidden">
+                                <span className="font-bold text-red-600">공휴일</span> {monthHolidays.join(' · ')}
+                            </p>
+                        )}
                         <div className="flex flex-wrap items-end justify-between gap-3 bg-slate-50 px-4 py-4 sm:px-6">
                             <div className="text-sm font-bold text-slate-500">
                                 {selectedEmployee ? `${selectedEmployee.name} · ${monthlyWorkDays}일 근무 · ${selectedEmployee.dailyHours}시간/일` : '직원을 추가하거나 선택해 주세요.'}
@@ -409,40 +433,40 @@ export default function TasksClient({
     )
 }
 
-function AttendanceInputs({ employee, inputClass }: { employee?: AttendanceEmployee; inputClass: string }) {
+function AttendanceInputs({ employee }: { employee?: AttendanceEmployee }) {
     return (
         <div className="space-y-3">
             <label className="block">
-                <span className="text-xs font-bold text-slate-500">직원명</span>
+                <span className={labelClass}>직원명</span>
                 <input
                     name="name"
                     required
                     defaultValue={employee?.name || ''}
                     placeholder="직원 이름"
-                    className={inputClass}
+                    className={fieldClass()}
                 />
             </label>
             <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                    <span className="text-xs font-bold text-slate-500">시급(원)</span>
+                    <span className={labelClass}>시급(원)</span>
                     <input
                         name="hourlyWage"
                         required
                         inputMode="numeric"
                         defaultValue={employee?.hourlyWage || ''}
                         placeholder="10000"
-                        className={`${inputClass} text-right tabular-nums`}
+                        className={fieldClass('text-right tabular-nums')}
                     />
                 </label>
                 <label className="block">
-                    <span className="text-xs font-bold text-slate-500">1일 근로시간</span>
+                    <span className={labelClass}>1일 근로시간</span>
                     <input
                         name="dailyHours"
                         required
                         inputMode="decimal"
                         defaultValue={employee?.dailyHours || ''}
                         placeholder="8"
-                        className={`${inputClass} text-right tabular-nums`}
+                        className={fieldClass('text-right tabular-nums')}
                     />
                 </label>
             </div>

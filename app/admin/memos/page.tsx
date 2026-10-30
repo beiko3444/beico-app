@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import MemosClient, { type AdminMemoItem } from './MemosClient'
 
+export const metadata = { title: '메모' }
+
 export const dynamic = 'force-dynamic'
 
 type AdminMemoRow = {

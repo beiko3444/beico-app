@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import TasksClient from './TasksClient'
 
+export const metadata = { title: '근태 관리' }
+
 export const dynamic = 'force-dynamic'
 
 export default async function TasksPage() {

@@ -8,6 +8,11 @@ import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 import Modal from '@/components/Modal'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import StatCard from '@/components/ui/StatCard'
+import Badge from '@/components/ui/Badge'
+import { fieldClass, labelClass } from '@/components/ui/field'
+import { formatDateRange, formatDateTime } from '@/lib/format'
 import {
     readInvoiceNotes, validateInvoiceNotes, MAX_INVOICE_NOTICES, MAX_NOTICE_TITLE_LENGTH,
     MAX_NOTICE_CONTENT_LENGTH, MAX_INVOICE_REMARKS_LENGTH,
@@ -178,16 +183,8 @@ export default function ElectricityClient() {
     const formatWon = (amount: number) => `${Math.round(amount).toLocaleString()}원`
 
     const formatPhotoUploadedAt = (value: string | null | undefined) => {
-        if (!value) return '업로드일 기록 없음'
-        const date = new Date(value)
-        if (Number.isNaN(date.getTime())) return '업로드일 기록 없음'
-        return date.toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
+        const label = formatDateTime(value)
+        return label === '-' ? '업로드일 기록 없음' : label
     }
 
     const monthKey = rentPaymentStatusKey
@@ -936,16 +933,14 @@ export default function ElectricityClient() {
         if (month > currentMonth) return false
         return currentDay >= 14
     }
-    const formatChecklistTimestamp = (value: string | null) => {
-        if (!value) return '-'
-        return new Date(value).toLocaleString('ko-KR')
-    }
+    const formatChecklistTimestamp = (value: string | null) => formatDateTime(value)
 
+    // Stored as YYYY-MM-DD; shown as 2026.10.14 without a timezone round trip.
     const formatRentPaidDateLabel = (value: string | null | undefined) => {
         if (!value) return '미입금'
-        const [, m, d] = value.split('-')
-        if (!m || !d) return value
-        return `${Number(m)}월 ${Number(d)}일`
+        const [y, m, d] = value.split('-')
+        if (!y || !m || !d) return value
+        return `${y}.${m}.${d} 입금`
     }
 
     const formatInvoiceHistoryDate = (year: number, month: number, value?: string | null) => {
@@ -965,7 +960,7 @@ export default function ElectricityClient() {
     const getRentPaymentInfo = (year: number, month: number) => {
         const nextMonth = month === 12 ? 1 : month + 1;
         const nextYear = month === 12 ? year + 1 : year;
-        const periodStr = `${year}년 ${month}월 14일 ~ ${nextYear}년 ${nextMonth}월 13일`;
+        const periodStr = formatDateRange(new Date(year, month - 1, 14), new Date(nextYear, nextMonth - 1, 13));
         const scheduledDepositDate = year === 2025 && month === 12 ? '12월 18일' : `${month}월 14일`
         const isDeposited = isPaymentDueByToday(year, month)
 
@@ -1000,6 +995,7 @@ export default function ElectricityClient() {
             rentAmount: hasRentDeposit ? MONTHLY_RENT_AMOUNT : 0,
             missingTaxInvoice,
             missingElectricityPayment,
+            shouldReview,
             needsAttention: missingTaxInvoice || missingElectricityPayment,
         }
     })
@@ -1052,7 +1048,7 @@ export default function ElectricityClient() {
         <div id="electricity-main" className="min-w-0 space-y-5 font-sans pb-20 print:pb-0 print:space-y-0">
             <PageHeader
                 title="전력 관리"
-                description="월별 전기요금 명세서와 임대인 분담, 납부 현황을 관리합니다."
+                description="월별 전기요금 고지서와 임대인 분담, 납부 현황을 관리합니다."
             />
 
             <Tabs
@@ -1068,36 +1064,33 @@ export default function ElectricityClient() {
 
             {/* Month Selection — shared by all three tabs */}
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedYear(selectedYear - 1)}
-                            className={buttonClass('ghost', 'sm', 'w-8 px-0')}
-                            aria-label="이전 연도"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                        <h2 className="min-w-[64px] text-center text-base font-black tabular-nums text-slate-900 dark:text-white">{selectedYear}년</h2>
-                        <button
-                            type="button"
-                            onClick={() => setSelectedYear(selectedYear + 1)}
-                            className={buttonClass('ghost', 'sm', 'w-8 px-0')}
-                            aria-label="다음 연도"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                        <span className="ml-1 text-xs font-medium text-slate-500 dark:text-gray-400">월 선택</span>
-                    </div>
-                    {activeTab !== 'rent-receipt' && !(activeTab === 'analysis' && !billData) && (
-                        <Button type="button" variant={billData ? 'secondary' : 'primary'} onClick={() => setIsUsageModalOpen(true)}>
-                            {billData ? `${selectedMonth}월 고지서 수정` : `${selectedMonth}월 명세서 입력`}
-                        </Button>
-                    )}
+                {/* Same header on every tab; bill actions live with the bill itself, so the grid never shifts. */}
+                <div className="flex min-h-10 flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedYear(selectedYear - 1)}
+                        className={buttonClass('secondary', 'iconMd')}
+                        aria-label="이전 연도"
+                        title="이전 연도"
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
+                    <h2 className="min-w-[64px] text-center text-base font-black tabular-nums text-slate-900 dark:text-white">{selectedYear}년</h2>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedYear(selectedYear + 1)}
+                        className={buttonClass('secondary', 'iconMd')}
+                        aria-label="다음 연도"
+                        title="다음 연도"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                    <span className="ml-1 text-xs font-medium text-slate-500 dark:text-gray-400">월 선택</span>
                 </div>
 
                 {/* Phones scroll the twelve months sideways instead of stacking four rows. */}
-                <div ref={monthStripRef} className="relative -mx-1 mt-3 flex snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-6 xl:grid-cols-12">
+                {/* Both ends fade on phones so cut-off months read as "more this way". */}
+                <div ref={monthStripRef} className="relative -mx-4 mt-3 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,transparent,#000_16px,#000_calc(100%-16px),transparent)] sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0 sm:[mask-image:none] lg:grid-cols-6 xl:grid-cols-12">
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                         const hasBill = monthlyBillStatuses[month]
                         const isSelected = selectedMonth === month
@@ -1105,6 +1098,12 @@ export default function ElectricityClient() {
                         const displayValue = calendarSummary?.value !== null && calendarSummary?.value !== undefined
                             ? calendarSummary.value.toLocaleString()
                             : calendarSummary?.label || '저장됨'
+                        // Each tab shows what matters there: bill amount, open payment items, or just the month.
+                        const paymentRow = monthlyPaymentRows.find(row => row.month === month)
+                        const paymentIssues = paymentRow
+                            ? [paymentRow.missingTaxInvoice && '세금계산서 미발행', paymentRow.missingElectricityPayment && '전기세 미납'].filter(Boolean).join(' · ')
+                            : ''
+                        const emphasized = activeTab === 'analysis' ? hasBill : activeTab === 'payment' ? Boolean(paymentRow?.shouldReview) : true
 
                         return (
                             <button
@@ -1113,19 +1112,20 @@ export default function ElectricityClient() {
                                 data-month={month}
                                 aria-pressed={isSelected}
                                 onClick={() => setSelectedMonth(month)}
-                                className={`min-h-[56px] min-w-[64px] shrink-0 snap-start rounded-xl border p-2 text-left transition-colors sm:min-h-[68px] sm:min-w-0 ${
+                                className={`min-h-[56px] min-w-[72px] shrink-0 snap-center rounded-xl border p-2 text-left transition-colors sm:min-h-[68px] sm:min-w-0 ${
                                     isSelected
-                                        ? 'border-slate-900 bg-white ring-1 ring-slate-900 dark:border-white dark:bg-[#1a1a1a] dark:ring-white'
-                                        : hasBill
+                                        ? 'border-transparent bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)] dark:bg-[#2a1d1a]'
+                                        : emphasized
                                             ? 'border-slate-200 bg-white hover:border-slate-400 dark:border-[#3a3a3a] dark:bg-[#1a1a1a]'
                                             : 'border-slate-100 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-[#2a2a2a] dark:bg-[#171717]'
                                 }`}
                             >
                                 <span className="flex items-center justify-between gap-2">
-                                    <span className={`text-sm font-black ${hasBill || isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-gray-400'}`}>{month}월</span>
-                                    {hasBill && <span aria-label="입력됨" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                                    <span className={`text-sm font-black ${isSelected ? 'text-brand-orange-strong' : emphasized ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-gray-400'}`}>{month}월</span>
+                                    {activeTab === 'analysis' && hasBill && <span aria-label="입력됨" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                                    {activeTab === 'payment' && paymentIssues && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
                                 </span>
-                                {hasBill ? (
+                                {activeTab === 'analysis' ? (hasBill ? (
                                     <>
                                         <span className="mt-1.5 block truncate text-sm font-black leading-tight tabular-nums text-slate-900 dark:text-white">{displayValue}</span>
                                         {calendarSummary?.value !== null && calendarSummary?.value !== undefined && (
@@ -1134,7 +1134,15 @@ export default function ElectricityClient() {
                                     </>
                                 ) : (
                                     <span aria-label="미입력" className="mt-1.5 block text-sm font-black leading-tight text-slate-300 dark:text-gray-600">—</span>
-                                )}
+                                )) : activeTab === 'payment' ? (
+                                    paymentIssues ? (
+                                        <span title={paymentIssues} className="mt-1 line-clamp-2 break-keep text-[11px] font-bold leading-tight text-amber-800 dark:text-amber-300">{paymentIssues}</span>
+                                    ) : paymentRow?.shouldReview ? (
+                                        <span className="mt-1 flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-gray-400"><Check size={12} strokeWidth={3} className="text-emerald-600" />처리 완료</span>
+                                    ) : (
+                                        <span className="mt-1 block text-[11px] font-bold text-slate-400 dark:text-gray-500">{paymentRow ? '도래 전' : '—'}</span>
+                                    )
+                                ) : null}
                             </button>
                         )
                     })}
@@ -1173,6 +1181,9 @@ export default function ElectricityClient() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3 dark:border-[#2a2a2a]">
+                                <Button type="button" variant="secondary" size="sm" onClick={() => setIsUsageModalOpen(true)}>
+                                    고지서 수정
+                                </Button>
                                 <Button type="button" variant="secondary" size="sm" onClick={() => setIsPhotoModalOpen(true)}>
                                     계량기 확인하기
                                 </Button>
@@ -1184,40 +1195,34 @@ export default function ElectricityClient() {
                                 </Button>
                             </div>
 
-                            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="bg-gray-50 dark:bg-[#1a1a1a] p-5 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-4 text-gray-100 group-hover:text-gray-200 transition-colors">
-                                        <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
-                                    </div>
-                                    <div className="text-[11px] text-gray-500 dark:text-gray-400 font-bold mb-1">베이코 분담 ({shareRatioBeico.toFixed(1)}%)</div>
-                                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{beicoTotal.toLocaleString()}원</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">베이코 이용요금</div>
-                                    {prevMonthData && (
-                                        <div className={`text-[11px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                            <div className="grid grid-cols-1 gap-3 p-6 sm:grid-cols-2">
+                                <StatCard
+                                    label={`베이코 분담 (${shareRatioBeico.toFixed(1)}%)`}
+                                    value={beicoTotal.toLocaleString()}
+                                    unit="원"
+                                    caption={prevMonthData ? (
+                                        <span className={beicoTotal - prevShares.beicoTotal >= 0 ? 'font-bold text-red-600' : 'font-bold text-blue-600'}>
                                             전월비 {beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}원
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="bg-brand-orange-soft p-5 rounded-2xl border border-red-100 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-4 text-red-100 group-hover:text-red-200 transition-colors">
-                                        <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
-                                    </div>
-                                    <div className="text-[11px] text-brand-orange font-bold mb-1">임대인 분담 ({shareRatioLandlord.toFixed(1)}%)</div>
-                                    <div className="text-2xl font-black text-slate-900 tracking-tight">{landlordTotal.toLocaleString()}원</div>
-                                    <div className="text-xs text-gray-500 mt-1">임대인 이용요금</div>
-                                    {prevMonthData && (
-                                        <div className={`text-[11px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                        </span>
+                                    ) : '베이코 이용요금'}
+                                />
+                                <StatCard
+                                    label={`임대인 분담 (${shareRatioLandlord.toFixed(1)}%)`}
+                                    value={landlordTotal.toLocaleString()}
+                                    unit="원"
+                                    caption={prevMonthData ? (
+                                        <span className={landlordTotal - prevShares.landlordTotal >= 0 ? 'font-bold text-red-600' : 'font-bold text-blue-600'}>
                                             전월비 {landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}원
-                                        </div>
-                                    )}
-                                </div>
+                                        </span>
+                                    ) : '임대인 이용요금 · 청구서 발행 대상'}
+                                />
                             </div>
                         </div>
 
                         {/* Detailed Comparison Table */}
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex justify-between items-center">
-                                <h3 className="text-base font-bold text-gray-800 dark:text-white">요금 분담 상세 내역</h3>
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-[#2a2a2a]">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white">요금 분담 상세 내역</h3>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[560px] text-[11px] text-left">
@@ -1307,10 +1312,10 @@ export default function ElectricityClient() {
                 ) : (
                     <EmptyState
                         title={`${selectedYear}년 ${selectedMonth}월 데이터 없음`}
-                        description="등록된 전기요금 명세서가 없습니다. 고지서 문자나 명세서 내용을 붙여넣어 등록하세요."
+                        description="등록된 전기요금 고지서가 없습니다. 고지서 문자를 붙여넣어 등록하세요."
                         action={(
                             <Button type="button" variant="primary" onClick={() => setIsUsageModalOpen(true)}>
-                                {selectedMonth}월 명세서 입력
+                                {selectedMonth}월 고지서 입력
                             </Button>
                         )}
                     />
@@ -1362,17 +1367,6 @@ export default function ElectricityClient() {
                                 <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
                             </div>
 
-                            {/* Red only when something is actually unpaid. */}
-                            <div className={`rounded-xl border px-4 py-3 ${unpaidLandlordElectricitySummary.total > 0 ? 'border-red-100 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20' : 'border-slate-200 bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]'}`}>
-                                <div className={`text-xs font-bold ${unpaidLandlordElectricitySummary.total > 0 ? 'text-red-700 dark:text-red-300' : 'text-slate-500 dark:text-gray-400'}`}>현재 일자 기준 임대인 미납 전기세</div>
-                                <div className="mt-1 text-lg font-black tabular-nums text-slate-900 dark:text-white">
-                                    {unpaidLandlordElectricitySummary.total.toLocaleString()}원
-                                </div>
-                                <div className="text-xs text-slate-600 dark:text-gray-400 mt-1">
-                                    {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
-                                </div>
-                            </div>
-
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
                                     <input
@@ -1415,26 +1409,45 @@ export default function ElectricityClient() {
                                         <div className="text-sm font-bold text-slate-900 dark:text-white">전기세 납부 완료</div>
                                         <div className="text-xs text-slate-600 dark:text-gray-400 mt-1">
                                             임대인 월별 전기세: <span className="font-bold tabular-nums text-slate-900 dark:text-white">{selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}</span>
+                                            {selectedMonthLandlordTotal === null && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); if (billData) setIsLandlordModalOpen(true); else setIsUsageModalOpen(true) }}
+                                                    className="ml-2 font-bold text-slate-700 underline underline-offset-2 hover:text-slate-900 dark:text-gray-300"
+                                                >
+                                                    {billData ? '임대인 사용량 입력' : '고지서 입력'}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </label>
                             </div>
                         </div>
 
-                        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
-                            <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex flex-wrap items-center justify-between gap-2">
-                                <h3 className="text-sm font-bold text-gray-800 dark:text-white">{selectedYear}년 월별 납부 현황</h3>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">행을 누르면 그 달을 선택합니다. 입금일자와 체크 결과는 DB에 저장됩니다.</div>
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 dark:border-[#2a2a2a]">
+                                <div className="min-w-0">
+                                    <h2 className="text-base font-black text-slate-900 dark:text-white">{selectedYear}년 월별 납부 현황</h2>
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">행을 누르면 그 달을 선택합니다. 입금일자와 체크 결과는 DB에 저장됩니다.</p>
+                                </div>
+                                {/* The year's unpaid total belongs to the yearly table, not the month checklist. Red only when something is unpaid. */}
+                                <div className={`rounded-xl border px-4 py-2.5 ${unpaidLandlordElectricitySummary.total > 0 ? 'border-red-100 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20' : 'border-slate-200 bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]'}`}>
+                                    <div className={`text-xs font-bold ${unpaidLandlordElectricitySummary.total > 0 ? 'text-red-700 dark:text-red-300' : 'text-slate-500 dark:text-gray-400'}`}>임대인 미납 전기세 · 오늘 기준</div>
+                                    <div className="mt-0.5 flex items-baseline gap-2">
+                                        <span className="text-lg font-black tabular-nums text-slate-900 dark:text-white">{unpaidLandlordElectricitySummary.total.toLocaleString()}원</span>
+                                        <span className="text-xs text-slate-600 dark:text-gray-400">{unpaidLandlordElectricitySummary.months}개월</span>
+                                    </div>
+                                </div>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[920px] table-fixed text-xs">
+                                <table className="w-full min-w-[960px] table-fixed text-xs">
                                     <thead className="ux-thead">
                                         <tr>
                                             <th className="w-[96px] whitespace-nowrap px-3 py-2 text-left">월</th>
                                             <th className="w-[155px] whitespace-nowrap px-3 py-2 text-center">월세 입금일자</th>
                                             <th className="w-[120px] whitespace-nowrap px-3 py-2 text-right">입금액</th>
                                             <th className="whitespace-nowrap px-3 py-2 text-center">임대일자</th>
-                                            <th className="w-[120px] whitespace-nowrap px-3 py-2 text-center">세금계산서</th>
+                                            <th className="w-[150px] whitespace-nowrap px-3 py-2 text-center">세금계산서</th>
                                             <th className="w-[130px] whitespace-nowrap px-3 py-2 text-right">임대인 전기세</th>
                                             <th className="w-[110px] whitespace-nowrap px-3 py-2 text-center">전기세 납부</th>
                                         </tr>
@@ -1452,18 +1465,18 @@ export default function ElectricityClient() {
                                                 const isSelected = m === selectedMonth
                                                 // Status pills carry the warning; the row stays neutral (selected month is the only tint).
                                                 const rowClassName = isSelected
-                                                    ? 'bg-slate-100/80 dark:bg-[#252525]'
+                                                    ? 'bg-brand-orange-soft dark:bg-[#2a1d1a]'
                                                     : 'hover:bg-slate-50 dark:hover:bg-[#1a1a1a]'
 
                                                 return (
                                                     <tr key={m} onClick={() => setSelectedMonth(m)} className={`cursor-pointer transition-colors ${rowClassName}`}>
-                                                        <td className={`whitespace-nowrap px-3 py-2.5 ${isSelected ? 'shadow-[inset_2px_0_0_#0f172a]' : ''}`}>
+                                                        <td className={`whitespace-nowrap px-3 py-2.5 ${isSelected ? 'shadow-[inset_2px_0_0_var(--color-brand-orange)]' : ''}`}>
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => { e.stopPropagation(); setSelectedMonth(m) }}
                                                                 aria-pressed={isSelected}
                                                                 aria-label={`${m}월 선택`}
-                                                                className={`text-xs ${isSelected ? 'font-black text-slate-900 dark:text-white' : 'font-bold text-slate-700 hover:underline dark:text-gray-300'}`}
+                                                                className={`text-xs ${isSelected ? 'font-black text-brand-orange-strong dark:text-white' : 'font-bold text-slate-700 hover:underline dark:text-gray-300'}`}
                                                             >
                                                                 {m}월
                                                             </button>
@@ -1476,25 +1489,24 @@ export default function ElectricityClient() {
                                                                 onChange={(e) => saveRentPaidDate(m, e.target.value || null)}
                                                                 disabled={savingRentMonth === m}
                                                                 aria-label={`${m}월 월세 입금일자`}
-                                                                className="w-[128px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium tabular-nums text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 disabled:opacity-60 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
+                                                                className={fieldClass(`h-8 w-[128px] rounded-md px-2 text-xs tabular-nums disabled:opacity-60 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] ${rentPaidDates[m] ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`)}
                                                             />
                                                         </td>
-                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-slate-900 dark:text-white">
+                                                        {/* Until a deposit date is recorded the expected amount stays grey, so it doesn't read as received. */}
+                                                        <td className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${rentPaidDates[m] ? 'font-bold text-slate-900 dark:text-white' : 'font-medium text-slate-400'}`}>
                                                             {rowRentInfo.amount}
                                                         </td>
                                                         <td className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] text-slate-500 dark:text-gray-400">
                                                             {rowRentInfo.period}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
-                                                            <span className={`inline-flex min-w-6 items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-black ${
-                                                                status.rentTaxInvoiceIssued
-                                                                    ? 'bg-emerald-50 text-emerald-700'
-                                                                    : missingTaxInvoice
-                                                                        ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
-                                                                        : 'bg-slate-100 dark:bg-[#252525] text-slate-400 dark:text-gray-400'
-                                                            }`}>
-                                                                {status.rentTaxInvoiceIssued ? <Check size={12} strokeWidth={3} aria-label="발행" /> : missingTaxInvoice ? '미발행' : '-'}
-                                                            </span>
+                                                            {status.rentTaxInvoiceIssued ? (
+                                                                <Badge tone="success" className="gap-1"><Check size={12} strokeWidth={3} aria-hidden="true" />발행</Badge>
+                                                            ) : missingTaxInvoice ? (
+                                                                <Badge tone="warning">세금계산서 미발행</Badge>
+                                                            ) : (
+                                                                <span className="text-slate-400">-</span>
+                                                            )}
                                                         </td>
                                                         <td className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${
                                                             missingElectricityPayment
@@ -1505,15 +1517,13 @@ export default function ElectricityClient() {
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
                                                             <div className="flex flex-col items-center">
-                                                                <span className={`inline-flex min-w-6 items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-black ${
-                                                                    status.electricityPaid
-                                                                        ? 'bg-emerald-50 text-emerald-700'
-                                                                        : missingElectricityPayment
-                                                                            ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
-                                                                            : 'bg-slate-100 dark:bg-[#252525] text-slate-400 dark:text-gray-400'
-                                                                }`}>
-                                                                    {status.electricityPaid ? <Check size={12} strokeWidth={3} aria-label="납부" /> : missingElectricityPayment ? '미납' : '-'}
-                                                                </span>
+                                                                {status.electricityPaid ? (
+                                                                    <Badge tone="success" className="gap-1"><Check size={12} strokeWidth={3} aria-hidden="true" />납부</Badge>
+                                                                ) : missingElectricityPayment ? (
+                                                                    <Badge tone="danger">미납</Badge>
+                                                                ) : (
+                                                                    <span className="text-slate-400">-</span>
+                                                                )}
                                                                 {status.electricityPaid && <div className="text-[11px] text-slate-500 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
                                                             </div>
                                                         </td>
@@ -1528,10 +1538,10 @@ export default function ElectricityClient() {
                                             <td className="whitespace-nowrap px-3 py-3 text-right">{formatWon(paymentSummary.rentTotal)}</td>
                                             <td className="whitespace-nowrap px-3 py-3 text-center text-gray-400">-</td>
                                             <td className="whitespace-nowrap px-3 py-3 text-center">
-                                                <span className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-400'}>
-                                                    미발행 {paymentSummary.missingTaxInvoiceMonths}건
+                                                <span className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-gray-400'}>
+                                                    세금계산서 미발행 {paymentSummary.missingTaxInvoiceMonths}건
                                                 </span>
-                                                <div className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'mt-0.5 text-[11px] text-red-700 dark:text-red-300' : 'mt-0.5 text-[11px] text-gray-400'}>
+                                                <div className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'mt-0.5 text-[11px] text-amber-800 dark:text-amber-300' : 'mt-0.5 text-[11px] text-gray-400'}>
                                                     {paymentSummary.missingTaxInvoiceTotal > 0 ? formatWon(paymentSummary.missingTaxInvoiceTotal) : '-'}
                                                 </div>
                                             </td>
@@ -1555,23 +1565,23 @@ export default function ElectricityClient() {
 
             {
                 isUsageModalOpen && (
-                    <Modal labelledBy="usage-modal-title" onClose={() => setIsUsageModalOpen(false)} className="bg-slate-950/55">
-                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsUsageModalOpen(false) }}>
+                    <Modal labelledBy="usage-modal-title" onClose={() => setIsUsageModalOpen(false)} className="bg-slate-950/50">
+                        <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsUsageModalOpen(false) }}>
                             {/* One scroll area for the whole body, so no field is cut off behind a column scrollbar. */}
-                            <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1e1e1e] dark:shadow-none">
+                            <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-[#1e1e1e] dark:shadow-none">
                                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 dark:border-[#2a2a2a]">
-                                    <h3 id="usage-modal-title" className="text-lg font-bold break-keep text-slate-900 dark:text-white">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
-                                    <button type="button" onClick={() => setIsUsageModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}><X size={16} /></button>
+                                    <h3 id="usage-modal-title" className="break-keep text-[18px] font-extrabold text-slate-900 dark:text-white">{selectedYear}년 {selectedMonth}월 고지서 입력</h3>
+                                    <ModalCloseButton onClick={() => setIsUsageModalOpen(false)} className="-mr-2" />
                                 </div>
 
                                 <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto px-6 py-5 md:grid-cols-2">
                                     <div className="space-y-3">
-                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">① 문자·명세서 붙여넣기</h4>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">① 고지서 문자 붙여넣기</h4>
                                         <textarea
                                             value={rawText}
                                             onChange={(e) => setRawText(e.target.value)}
-                                            aria-label="문자/명세서 내용"
-                                            className="h-40 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
+                                            aria-label="고지서 문자 내용"
+                                            className={fieldClass('h-40 resize-none p-3 font-mono text-xs dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white')}
                                             placeholder="여기에 텍스트를 붙여넣고 [데이터 추출하기]를 누르면 오른쪽 폼이 자동으로 채워집니다."
                                         />
                                         <button type="button" onClick={parseBillText} className={buttonClass('secondary', 'md', 'w-full')}>
@@ -1599,7 +1609,7 @@ export default function ElectricityClient() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => deleteHistoryItem(item.id)}
-                                                                className="inline-flex w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                                                                className={buttonClass('dangerGhost', 'icon', 'h-auto min-h-8 text-slate-400')}
                                                                 title="삭제"
                                                                 aria-label="추출 히스토리 삭제"
                                                             >
@@ -1641,7 +1651,15 @@ export default function ElectricityClient() {
                                 </div>
 
                                 <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-[#2a2a2a]">
-                                    <Button type="button" variant="ghost" onClick={resetManualInputs} className="mr-auto">상세내역 초기화</Button>
+                                    <Button
+                                        type="button"
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() => { if (confirm('입력한 고지서 상세내역을 모두 지울까요?')) resetManualInputs() }}
+                                        className="mr-auto self-center"
+                                    >
+                                        상세내역 초기화
+                                    </Button>
                                     <Button type="button" variant="secondary" onClick={() => setIsUsageModalOpen(false)}>취소</Button>
                                     <Button type="button" variant="primary" onClick={confirmBillInput} loading={loading}>
                                         {loading ? '저장 중...' : '저장'}
@@ -1655,12 +1673,12 @@ export default function ElectricityClient() {
 
             {
                 isLandlordModalOpen && (
-                    <Modal labelledBy="landlord-modal-title" onClose={() => setIsLandlordModalOpen(false)} className="bg-slate-950/55">
-                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsLandlordModalOpen(false) }}>
-                            <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1e1e1e] dark:shadow-none">
+                    <Modal labelledBy="landlord-modal-title" onClose={() => setIsLandlordModalOpen(false)} className="bg-slate-950/50">
+                        <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsLandlordModalOpen(false) }}>
+                            <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:rounded-2xl dark:bg-[#1e1e1e] dark:shadow-none">
                                 <div className="mb-4 flex items-center justify-between gap-3">
-                                    <h3 id="landlord-modal-title" className="text-lg font-bold text-slate-900 dark:text-white">임대인 사용량 입력</h3>
-                                    <button type="button" onClick={() => setIsLandlordModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}><X size={16} /></button>
+                                    <h3 id="landlord-modal-title" className="text-[18px] font-extrabold text-slate-900 dark:text-white">임대인 사용량 입력</h3>
+                                    <ModalCloseButton onClick={() => setIsLandlordModalOpen(false)} className="-mr-2" />
                                 </div>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
@@ -1673,7 +1691,7 @@ export default function ElectricityClient() {
                                     </div>
 
                                     <div className="pt-4">
-                                        <p className="mb-2 text-xs font-bold text-slate-500 dark:text-gray-400">계량기 사진 업로드</p>
+                                        <p className={labelClass}>계량기 사진 업로드</p>
                                         <div className="relative cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50 dark:border-[#2a2a2a] dark:hover:bg-[#1a1a1a]">
                                             <input type="file" accept="image/*" aria-label="계량기 사진 업로드" onChange={handlePhotoChange} className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
                                             {landlordPhoto ? (
@@ -1710,14 +1728,12 @@ export default function ElectricityClient() {
 
             {
                 isPhotoModalOpen && landlordData && (
-                    <Modal labelledBy="photo-modal-title" onClose={() => setIsPhotoModalOpen(false)} className="bg-slate-950/80">
-                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsPhotoModalOpen(false) }}>
-                            <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-5 sm:p-8 dark:bg-[#1e1e1e]">
+                    <Modal labelledBy="photo-modal-title" onClose={() => setIsPhotoModalOpen(false)} className="bg-slate-950/50">
+                        <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsPhotoModalOpen(false) }}>
+                            <div className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl sm:p-8 dark:bg-[#1e1e1e]">
                                 <div className="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-[#2a2a2a]">
-                                    <h3 id="photo-modal-title" className="text-xl font-black text-slate-900 break-keep dark:text-white">계량기 사진 확인 (전월 vs 당월)</h3>
-                                    <button type="button" onClick={() => setIsPhotoModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-9 px-0')}>
-                                        <X size={18} />
-                                    </button>
+                                    <h3 id="photo-modal-title" className="break-keep text-[18px] font-extrabold text-slate-900 dark:text-white">계량기 사진 확인 (전월 vs 당월)</h3>
+                                    <ModalCloseButton onClick={() => setIsPhotoModalOpen(false)} className="-mr-2" />
                                 </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 font-sans">
                                 <div className="space-y-4">
@@ -1772,7 +1788,10 @@ export default function ElectricityClient() {
             {
                 isInvoiceOpen && landlordData && billData && (
                     <div id="print-modal"
-                        className="fixed inset-0 bg-gray-950/95 z-[1200] flex items-start justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:static print:block print:p-0"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`${selectedMonth}월 전기요금 청구서`}
+                        className="fixed inset-0 bg-slate-950/50 z-[1200] flex items-start justify-center p-0 sm:p-4 overflow-y-auto print:static print:block print:p-0"
                     >
                         <div
                             className="bg-white w-full min-w-0 max-w-[210mm] shadow-2xl relative print:static print:transform-none print:m-0 print:shadow-none"
@@ -1786,8 +1805,8 @@ export default function ElectricityClient() {
                                     <Button size="sm" onClick={saveInvoiceNotes} loading={savingInvoiceNotes} disabled={!invoiceNotesDirty}>고지 내용 저장</Button>
                                     <span className="text-xs text-gray-500" role="status">{savingInvoiceNotes ? '저장 중…' : invoiceNotesDirty ? '저장하지 않은 변경사항' : invoiceNotesStatus || '월별 고지 내용'}</span>
                                     <div className="ml-auto flex gap-2">
-                                        <Button variant="secondary" size="sm" disabled={savingInvoiceNotes} onClick={printInvoice}>인쇄 / PDF</Button>
-                                        <Button variant="ghost" size="sm" disabled={savingInvoiceNotes} onClick={closeInvoice}>닫기</Button>
+                                        <Button variant="secondary" size="sm" disabled={savingInvoiceNotes} onClick={printInvoice} icon={<Printer size={14} />}>인쇄 / PDF</Button>
+                                        <ModalCloseButton onClick={() => { if (!savingInvoiceNotes) closeInvoice() }} label="청구서 닫기" />
                                     </div>
                                 </div>
                                 {invoiceNotesError && <p role="alert" className="px-3 pb-2 text-sm text-red-600">{invoiceNotesError}</p>}
@@ -1810,15 +1829,15 @@ export default function ElectricityClient() {
                                                 <div key={index} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
                                                     <div className="flex items-center justify-between">
                                                         <label htmlFor={`invoice-notice-title-${index}`} className="text-xs font-bold">고지 {index + 1} · 제목</label>
-                                                        <button type="button" aria-label={`고지 항목 ${index + 1} 삭제`} className="min-h-10 px-2 text-xs font-medium text-red-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-orange" onClick={() => setInvoiceNotices(prev => prev.filter((_, i) => i !== index))}>삭제</button>
+                                                        <button type="button" aria-label={`고지 항목 ${index + 1} 삭제`} className={buttonClass('dangerGhost', 'sm', 'px-2')} onClick={() => setInvoiceNotices(prev => prev.filter((_, i) => i !== index))}>삭제</button>
                                                     </div>
-                                                    <input id={`invoice-notice-title-${index}`} value={notice.title} maxLength={MAX_NOTICE_TITLE_LENGTH} placeholder="예: 세금계산서 발행 요청" className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} />
+                                                    <input id={`invoice-notice-title-${index}`} value={notice.title} maxLength={MAX_NOTICE_TITLE_LENGTH} placeholder="예: 세금계산서 발행 요청" className={fieldClass()} onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} />
                                                     <label htmlFor={`invoice-notice-content-${index}`} className="block text-xs font-bold">내용</label>
-                                                    <textarea id={`invoice-notice-content-${index}`} value={notice.content} maxLength={MAX_NOTICE_CONTENT_LENGTH} rows={3} placeholder="고지할 내용을 입력해주세요. 줄바꿈도 그대로 인쇄됩니다." className="w-full resize-y rounded-lg border border-gray-300 p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, content: e.target.value } : item))} />
+                                                    <textarea id={`invoice-notice-content-${index}`} value={notice.content} maxLength={MAX_NOTICE_CONTENT_LENGTH} rows={3} placeholder="고지할 내용을 입력해주세요. 줄바꿈도 그대로 인쇄됩니다." className={fieldClass('h-auto resize-y py-2')} onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, content: e.target.value } : item))} />
                                                 </div>
                                             ))}
                                             <label htmlFor="invoice-remarks" className="block text-xs font-bold">하단 비고 메시지</label>
-                                            <textarea id="invoice-remarks" value={invoiceRemarks} maxLength={MAX_INVOICE_REMARKS_LENGTH} onChange={e => setInvoiceRemarks(e.target.value)} rows={3} placeholder="청구서 하단에 표시할 안내사항" className="w-full resize-y rounded-lg border border-gray-300 bg-white p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" />
+                                            <textarea id="invoice-remarks" value={invoiceRemarks} maxLength={MAX_INVOICE_REMARKS_LENGTH} onChange={e => setInvoiceRemarks(e.target.value)} rows={3} placeholder="청구서 하단에 표시할 안내사항" className={fieldClass('h-auto resize-y py-2')} />
                                         </fieldset>
                                     </div>
                                 )}
@@ -2208,13 +2227,13 @@ function InputGroup({ label, value, onChange, placeholder = '', isNumeric = true
 
     return (
         <label className="block">
-            <span className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">{label}</span>
+            <span className={`${labelClass} dark:text-gray-400`}>{label}</span>
             <input
                 type="text"
                 inputMode={isNumeric ? 'numeric' : undefined}
                 value={value}
                 onChange={handleChange}
-                className={`h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white ${isNumeric ? 'text-right tabular-nums' : ''}`}
+                className={fieldClass(`dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white ${isNumeric ? 'text-right tabular-nums' : ''}`)}
                 placeholder={placeholder}
             />
         </label>

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Plus, Minus, X, CheckCircle2, ChevronRight, LayoutGrid, Wand2, AlertCircle, Undo2, Redo2, Calendar } from 'lucide-react'
 import PageHeader from '@/components/ui/PageHeader'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass } from '@/components/ui/field'
 
 // Add styles/keyframes for the gradient border
 const styles = `
@@ -1737,7 +1738,8 @@ export default function MindBoardClient() {
     return (
         // The canvas fills the area the shell leaves free: below the 56px mobile header / 60px top bar, right of the 240px sidebar.
         <div className="fixed inset-x-0 bottom-0 top-14 z-10 flex flex-col bg-white lg:left-[240px] lg:top-[60px]">
-            <div className="shrink-0 border-b border-slate-200 bg-white px-4 pt-3 lg:px-6 lg:pt-4">
+            {/* Same offsets and background as the shell's <main>, so the title doesn't jump between menus. */}
+            <div className="shrink-0 border-b border-slate-200 bg-[var(--background)] px-3 pt-3 sm:px-5 sm:pt-5 lg:px-6 lg:pt-6">
                 <PageHeader
                     title="마인드보드"
                     description={(
@@ -1853,7 +1855,7 @@ export default function MindBoardClient() {
                             <LayoutGrid size={20} />
                         </div>
                         <h2 className="text-base font-black text-slate-900">첫 보드를 만들어 시작하세요</h2>
-                        <p className="mt-1 break-keep text-xs text-slate-500">보드를 만들면 메모를 추가하고 그룹으로 묶을 수 있습니다.</p>
+                        <p className="mt-1 break-keep text-balance text-xs text-slate-500">보드를 만들면 메모를 추가하고 그룹으로 묶을 수 있습니다.</p>
                         <div className="mt-4 flex gap-2">
                             <input
                                 name="boardTitle"
@@ -1861,7 +1863,7 @@ export default function MindBoardClient() {
                                 autoFocus
                                 placeholder="보드 이름"
                                 aria-label="새 보드 이름"
-                                className="h-10 min-w-0 flex-1 rounded-[10px] border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                                className={fieldClass('min-w-0 flex-1')}
                             />
                             <button type="submit" className={buttonClass('primary', 'md')}>보드 만들기</button>
                         </div>
@@ -1978,9 +1980,9 @@ export default function MindBoardClient() {
                                 required
                                 placeholder="새 보드 이름"
                                 aria-label="새 보드 이름"
-                                className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                                className={fieldClass('h-8 min-w-0 flex-1 rounded-lg px-2')}
                             />
-                            <button type="submit" aria-label="새 보드 만들기" title="새 보드 만들기" className={buttonClass('secondary', 'sm', 'w-8 px-0')}>
+                            <button type="submit" aria-label="새 보드 만들기" title="새 보드 만들기" className={buttonClass('secondary', 'icon')}>
                                 <Plus size={14} />
                             </button>
                         </form>

@@ -21,6 +21,8 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import PageHeader from '@/components/ui/PageHeader'
+import StatCard from '@/components/ui/StatCard'
+import { selectClass } from '@/components/ui/field'
 
 const BRAND = '#d9341a'
 const BRAND_STRONG = '#b32d17'
@@ -34,6 +36,7 @@ const GUIDE_LINE = '#94a3b8'
 const LAND_FILL = '#e2e8f0'
 const LAND_STROKE = '#cbd5e1'
 const MUTED_BUBBLE = '#475569'
+const LABEL_HALO = '#334155'
 
 type RegionCount = [string, number]
 type MonthRecord = { total: number; regions: RegionCount[] }
@@ -213,28 +216,71 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{
   )
 }
 
-function MetricCard({
-  label,
-  value,
-  detail,
-  icon,
-  className = '',
-}: {
-  label: string
-  value: string
-  detail: string
-  icon: React.ReactNode
-  className?: string
-}) {
+type MapBubble = {
+  region: string
+  value: number
+  rank: number
+  /** Where the region really is; the circle moves away from it only to avoid overlapping. */
+  anchorX: number
+  anchorY: number
+  x: number
+  y: number
+  radius: number
+  /** Ranks 5+ are small dots with a rank chip so they never hide the leaders. */
+  dot: boolean
+  /** Space the mark needs; a dot reserves room for the rank chip beside it. */
+  reserve: number
+  isSelected: boolean
+}
+
+const DOT_RADIUS = 5
+
+const footprint = (bubble: MapBubble) => bubble.reserve
+// Pushes the smaller of two overlapping marks outward until none overlap, so a circle
+// never covers another circle's label; a leader line then points back to the real spot.
+function spreadBubbles(bubbles: MapBubble[]) {
+  const placed = bubbles.map((bubble) => ({ ...bubble }))
+  for (let pass = 0; pass < 60; pass += 1) {
+    let moved = false
+    for (let i = 0; i < placed.length; i += 1) {
+      for (let j = i + 1; j < placed.length; j += 1) {
+        const a = placed[i]
+        const b = placed[j]
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let distance = Math.hypot(dx, dy)
+        if (distance < 0.01) {
+          dx = 1
+          dy = 0
+          distance = 1
+        }
+        const overlap = footprint(a) + footprint(b) + 4 - distance
+        if (overlap <= 0) continue
+        const mover = footprint(b) <= footprint(a) ? b : a
+        const direction = mover === b ? 1 : -1
+        mover.x += (dx / distance) * overlap * direction
+        mover.y += (dy / distance) * overlap * direction
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+  return placed.map((bubble) => ({
+    ...bubble,
+    x: Math.min(MAP_WIDTH - footprint(bubble), Math.max(footprint(bubble), bubble.x)),
+    y: Math.min(MAP_HEIGHT - footprint(bubble), Math.max(footprint(bubble), bubble.y)),
+  }))
+}
+
+function RankChip({ x, y, rank, large }: { x: number; y: number; rank: number; large: boolean }) {
+  const size = large ? 26 : 16
   return (
-    <div className={`min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm ${className}`}>
-      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-500">
-        <span className="break-keep">{label}</span>
-        <span className="text-slate-400">{icon}</span>
-      </div>
-      <div className="mt-1 truncate text-2xl font-extrabold tabular-nums text-slate-900">{value}</div>
-      <div className="mt-0.5 break-keep text-[11px] font-bold text-slate-500">{detail}</div>
-    </div>
+    <g>
+      <rect x={x} y={y - size / 2} width={size} height={size} rx={size / 2} fill="#FFFFFF" stroke={AXIS_LINE} strokeWidth={1} />
+      <text x={x + size / 2} y={y} dy="0.35em" textAnchor="middle" fill="#334155" fontSize={large ? 18 : 11} fontWeight={900}>
+        {rank}
+      </text>
+    </g>
   )
 }
 
@@ -264,24 +310,33 @@ function KoreaActivityMap({
     }))
   }, [topology])
 
-  const mappableRegions = regions.filter(([region]) => coordinates[region])
-  const maxValue = Math.max(...mappableRegions.map(([, value]) => value), 1)
-  const bubbles = mappableRegions.map(([region, value], index) => {
-    const [x, y] = projectPoint(coordinates[region])
-    return {
-      region,
-      value,
-      rank: index + 1,
-      x,
-      y,
-      radius: 11 + Math.sqrt(value / maxValue) * 28,
-      isSelected: selectedRegion === region,
-      showName: index < 4 || selectedRegion === region,
-    }
-  })
+  const bubbles = useMemo(() => {
+    const ranked = regions.map(([region, value], index) => ({ region, value, rank: index + 1 }))
+      .filter(({ region }) => coordinates[region])
+    const maxValue = Math.max(...ranked.map(({ value }) => value), 1)
+    return spreadBubbles(ranked.map(({ region, value, rank }) => {
+      const [x, y] = projectPoint(coordinates[region])
+      const isSelected = selectedRegion === region
+      const radius = 11 + Math.sqrt(value / maxValue) * 20
+      const dot = rank > 4 && !isSelected
+      return {
+        region,
+        value,
+        rank,
+        anchorX: x,
+        anchorY: y,
+        x,
+        y,
+        radius,
+        dot,
+        reserve: dot ? (hideLabels ? 26 : 16) : radius,
+        isSelected,
+      }
+    }))
+  }, [regions, coordinates, selectedRegion, hideLabels])
 
   return (
-    <div className="relative mx-auto w-full max-w-[560px]">
+    <div className="relative mx-auto w-full max-w-[480px]">
       <svg
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
         className="block h-auto w-full"
@@ -300,18 +355,19 @@ function KoreaActivityMap({
             />
           ))}
         </g>
-        {/* All circles first, then all labels, so a later bubble never covers an earlier label. */}
+        {/* Leader lines for marks moved off their spot, then circles, then labels on top. */}
+        <g aria-hidden="true">
+          {bubbles.map((bubble) => Math.hypot(bubble.x - bubble.anchorX, bubble.y - bubble.anchorY) > 4 ? (
+            <g key={bubble.region}>
+              <line x1={bubble.anchorX} y1={bubble.anchorY} x2={bubble.x} y2={bubble.y} stroke={GUIDE_LINE} strokeWidth={1.5} />
+              <circle cx={bubble.anchorX} cy={bubble.anchorY} r={2.5} fill={GUIDE_LINE} />
+            </g>
+          ) : null)}
+        </g>
         <g>
           {bubbles.map((bubble) => (
-            <circle
+            <g
               key={bubble.region}
-              cx={bubble.x}
-              cy={bubble.y}
-              r={bubble.radius}
-              fill={bubble.isSelected ? BRAND : MUTED_BUBBLE}
-              fillOpacity={bubble.isSelected ? 0.96 : 0.75}
-              stroke={bubble.isSelected ? INK : '#FFFFFF'}
-              strokeWidth={2}
               role="button"
               tabIndex={0}
               aria-label={`${bubble.rank}위 ${bubble.region} ${formatCount(bubble.value)}건`}
@@ -321,23 +377,55 @@ function KoreaActivityMap({
                 if (event.key === 'Enter' || event.key === ' ') onSelectRegion(bubble.region)
               }}
               className="cursor-pointer"
-            />
+            >
+              {bubble.isSelected ? (
+                <circle cx={bubble.x} cy={bubble.y} r={bubble.radius + 5} fill="none" stroke={BRAND} strokeWidth={2} />
+              ) : null}
+              <circle
+                cx={bubble.x}
+                cy={bubble.y}
+                r={bubble.dot ? DOT_RADIUS : bubble.radius}
+                fill={bubble.isSelected ? BRAND : MUTED_BUBBLE}
+                stroke="#FFFFFF"
+                strokeWidth={bubble.dot ? 1.5 : 2}
+              />
+              {/* A larger invisible target keeps small dots easy to tap. */}
+              {bubble.dot ? <circle cx={bubble.x} cy={bubble.y} r={14} fill="transparent" /> : null}
+            </g>
           ))}
         </g>
-        {hideLabels ? null : (
-          <g className="pointer-events-none" aria-hidden="true">
-            {bubbles.map((bubble) => bubble.showName ? (
-              <text key={bubble.region} x={bubble.x} y={bubble.y - 2} textAnchor="middle" className="fill-white text-[12px] font-black">
+        <g className="pointer-events-none" aria-hidden="true">
+          {bubbles.map((bubble) => {
+            if (bubble.dot) {
+              return <RankChip key={bubble.region} x={bubble.x + DOT_RADIUS + 3} y={bubble.y} rank={bubble.rank} large={hideLabels} />
+            }
+            // Narrow screens show only the rank, sized to stay ~11px once the map is scaled down.
+            if (hideLabels) {
+              return (
+                <text key={bubble.region} x={bubble.x} y={bubble.y} dy="0.35em" textAnchor="middle" fill="#FFFFFF" fontSize={20} fontWeight={900}>
+                  {bubble.rank}
+                </text>
+              )
+            }
+            return (
+              <text
+                key={bubble.region}
+                x={bubble.x}
+                y={bubble.y - 2}
+                textAnchor="middle"
+                fill="#FFFFFF"
+                stroke={LABEL_HALO}
+                strokeWidth={3}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+                className="text-[12px] font-black"
+              >
                 <tspan x={bubble.x}>{labelRegionName(bubble.region, ambiguousNames)}</tspan>
                 <tspan x={bubble.x} dy="14" className="text-[11px] font-bold">{formatCount(bubble.value)}</tspan>
               </text>
-            ) : (
-              <text key={bubble.region} x={bubble.x} y={bubble.y + 4} textAnchor="middle" className="fill-white text-[11px] font-black">
-                {bubble.rank}
-              </text>
-            ))}
-          </g>
-        )}
+            )
+          })}
+        </g>
       </svg>
       {!topology ? (
         <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-slate-500">지도를 불러오는 중</div>
@@ -385,6 +473,8 @@ export default function SeasonRadarClient() {
   const season = getPeakSeason(values)
   const selectedRecord = fishRecord?.[String(selectedMonth)] || { total: 0, regions: [] }
   const yearTotal = values.reduce((sum, value) => sum + value, 0)
+  const selectedValue = selectedRecord.regions.find(([region]) => region === selectedRegion)?.[1] || 0
+  const selectedShare = selectedRecord.total ? Math.round((selectedValue / selectedRecord.total) * 100) : 0
   const isNarrow = useIsNarrow()
   const ambiguousNames = useMemo(() => findAmbiguousShortNames(Object.keys(coordinates)), [coordinates])
   // The month buttons double as the x-axis labels, so they share the plot's left/right insets.
@@ -419,14 +509,14 @@ export default function SeasonRadarClient() {
         description="어종별로 조황 게시글이 많은 달과 지역을 봅니다."
         actions={(
           <label className="flex min-w-0 items-center gap-2">
-            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-black text-slate-600">
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-bold text-slate-700">
               <Fish size={14} className="text-slate-400" />
               분석 어종
             </span>
             <select
               value={selectedFish}
               onChange={(event) => handleFishChange(event.target.value)}
-              className="h-10 w-full min-w-[140px] rounded-[10px] border border-slate-300 bg-white px-3 text-[14px] font-black text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 sm:w-[200px]"
+              className={selectClass(true, 'min-w-[140px] sm:w-[200px]')}
             >
               {FISH_ORDER.map((fish) => <option key={fish}>{fish}</option>)}
             </select>
@@ -436,24 +526,27 @@ export default function SeasonRadarClient() {
 
       <div className="space-y-4">
         <section className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-          <MetricCard
+          <StatCard
             label="피크 시즌"
-            value={`${season.start}월-${season.end}월`}
-            detail={`평균 ${formatCount(Math.round(season.average))}건 이상`}
-            icon={<CalendarRange size={16} />}
+            value={`${season.start}–${season.end}`}
+            unit="월"
+            caption={`평균 ${formatCount(Math.round(season.average))}건 이상`}
+            icon={<CalendarRange />}
           />
-          <MetricCard
+          <StatCard
             label="최고 활발 월"
-            value={`${season.peak}월`}
-            detail={`${formatCount(values[season.peak - 1])}건 언급`}
-            icon={<TrendingUp size={16} />}
+            value={season.peak}
+            unit="월"
+            caption={`${formatCount(values[season.peak - 1])}건 언급`}
+            icon={<TrendingUp />}
           />
-          <MetricCard
+          <StatCard
             className="col-span-2 lg:col-span-1"
             label="전체 분석량"
-            value={`${formatCount(yearTotal)}건`}
-            detail="2015.01-2026.09 게시글 언급"
-            icon={<Database size={16} />}
+            value={formatCount(yearTotal)}
+            unit="건"
+            caption="2015.01–2026.09 게시글 언급"
+            icon={<Database />}
           />
         </section>
 
@@ -589,7 +682,7 @@ export default function SeasonRadarClient() {
               <h2 className="text-[16px] font-black text-slate-900 break-keep">{selectedFish} · {selectedMonth}월 활발 지역</h2>
               <span className="whitespace-nowrap text-[11px] font-bold text-slate-500">원 크기 = 지역별 조황 언급 수</span>
             </div>
-            <div className="bg-slate-50 p-3 sm:p-5">
+            <div className="bg-slate-50 p-3">
               <KoreaActivityMap
                 topology={topology}
                 coordinates={coordinates}
@@ -604,44 +697,57 @@ export default function SeasonRadarClient() {
 
           <aside className="min-w-0 bg-white">
             <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="text-[22px] font-black text-slate-900 break-keep">
+              <div className="text-[12px] font-bold text-slate-500">선택 지역</div>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 break-keep">
+                <span className="text-[22px] font-black text-slate-900">
+                  {selectedRegion ? (
+                    <>
+                      <span className="mr-1.5 text-[15px] font-bold text-slate-400">{provinceName(selectedRegion)}</span>
+                      {shortRegionName(selectedRegion)}
+                    </>
+                  ) : '지역 없음'}
+                </span>
                 {selectedRegion ? (
-                  <>
-                    <span className="mr-1.5 text-[15px] font-bold text-slate-400">{provinceName(selectedRegion)}</span>
-                    {shortRegionName(selectedRegion)}
-                  </>
-                ) : '지역 없음'}
-              </div>
-              <div className="mt-0.5 text-[12px] font-bold tabular-nums text-slate-500">
-                {selectedMonth}월 전체 {formatCount(selectedRecord.total)}건
+                  <span className="text-[14px] font-bold tabular-nums text-slate-700">
+                    {formatCount(selectedValue)}건
+                    <span className="ml-1 text-[12px] text-slate-500">({selectedMonth}월의 {selectedShare}%)</span>
+                  </span>
+                ) : null}
               </div>
             </div>
+            <div className="flex items-baseline justify-between gap-2 px-4 pt-3 sm:px-5">
+              <h3 className="text-[13px] font-black text-slate-900">{selectedMonth}월 지역 순위</h3>
+              <span className="text-[12px] font-bold tabular-nums text-slate-500">전체 {formatCount(selectedRecord.total)}건</span>
+            </div>
             <ol className="divide-y divide-slate-100 px-3 py-2 sm:px-4">
-              {selectedRecord.regions.map(([region, value], index) => (
-                <li key={region}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRegion(region)}
-                    aria-pressed={selectedRegion === region}
-                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${selectedRegion === region ? 'bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)]' : 'hover:bg-slate-50'}`}
-                  >
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black tabular-nums ${index === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-black text-slate-800">
-                      <span className="mr-1 font-bold text-slate-400">{provinceName(region)}</span>
-                      {shortRegionName(region)}
-                    </span>
-                    <span className="shrink-0 text-[13px] font-black tabular-nums text-slate-900">{formatCount(value)}건</span>
-                  </button>
-                </li>
-              ))}
+              {selectedRecord.regions.map(([region, value], index) => {
+                const selected = selectedRegion === region
+                return (
+                  <li key={region}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRegion(region)}
+                      aria-pressed={selected}
+                      className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition ${selected ? 'bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)]' : 'hover:bg-slate-50'}`}
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black tabular-nums text-slate-600">
+                        {index + 1}
+                      </span>
+                      <span className={`min-w-0 flex-1 truncate text-[13px] font-black ${selected ? 'text-brand-orange-strong' : 'text-slate-800'}`}>
+                        <span className="mr-1 font-bold text-slate-400">{provinceName(region)}</span>
+                        {shortRegionName(region)}
+                      </span>
+                      <span className="shrink-0 text-[13px] font-black tabular-nums text-slate-900">{formatCount(value)}건</span>
+                    </button>
+                  </li>
+                )
+              })}
             </ol>
           </aside>
         </section>
 
         <footer className="break-keep px-1 pb-2 text-[11px] font-bold leading-5 text-slate-500">
-          선상24 전체 조황 게시글(2015.01~2026.09)의 어종 언급 빈도를 월·지역별로 집계한 계절 패턴입니다. 게시글 활동도이며 판매 수요나 실제 어획량과 다를 수 있고, 실시간 전망이 아닙니다. 지도 경계: KOSTAT 2018, 위치: OpenStreetMap.
+          선상24 전체 조황 게시글(2015.01–2026.09)의 어종 언급 빈도를 월·지역별로 집계한 계절 패턴입니다. 게시글 활동도이며 판매 수요나 실제 어획량과 다를 수 있고, 실시간 전망이 아닙니다. 지도 경계: KOSTAT 2018, 위치: OpenStreetMap.
         </footer>
       </div>
     </div>

@@ -28,6 +28,10 @@ import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge from '@/components/ui/Badge'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass } from '@/components/ui/field'
+import { formatDateTime } from '@/lib/format'
 
 export type AdminMemoAttachmentItem = {
   id: string
@@ -82,6 +86,10 @@ const emptyForm = (): MemoForm => ({
 })
 
 const categories = ['전체', '일반', '주문', '재고', '수출', '카드', '거래처', '아이디어', '기타']
+const formCategories = categories.slice(1)
+
+// Fades a horizontally scrolling row at both ends so a cut-off chip reads as "more this way".
+const scrollFade = '[mask-image:linear-gradient(to_right,transparent,#000_16px,#000_calc(100%-24px),transparent)]'
 
 // A memo's colour is a left accent bar on a white card, so colour stays a label and never reads as a status fill.
 const colorOptions = [
@@ -98,14 +106,6 @@ type StatusFilter = 'active' | 'pinned' | 'archived'
 
 // Roughly three lines of the card body; only longer memos get a 더보기 toggle.
 const isLongContent = (value: string) => value.split('\n').length > 3 || value.length > 120
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
 
 const includes = (value: string, query: string) => value.toLowerCase().includes(query)
 
@@ -136,6 +136,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
   const [saving, setSaving] = useState(false)
   const [showFormPassword, setShowFormPassword] = useState(false)
+  const [customCategoryOpen, setCustomCategoryOpen] = useState(false)
   const [revealedPasswordIds, setRevealedPasswordIds] = useState<string[]>([])
 
   const togglePasswordReveal = (memoId: string) => {
@@ -178,6 +179,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
 
   const resetForm = () => {
     setForm(emptyForm())
+    setCustomCategoryOpen(false)
     setKeepAttachmentIds([])
     setNewAttachments([])
     setIsDraggingFiles(false)
@@ -317,6 +319,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
       siteUrl: memo.siteUrl || '',
     })
     setKeepAttachmentIds(memo.attachments.map((attachment) => attachment.id))
+    setCustomCategoryOpen(false)
     setNewAttachments([])
     setIsDraggingFiles(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -351,7 +354,9 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
     }
   }
 
-  const inputClass = 'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/15'
+  const inputClass = fieldClass()
+  // A category typed earlier that isn't one of the presets still shows as a chip.
+  const customCategory = formCategories.includes(form.category) ? '' : form.category
 
   return (
     <div className="min-w-0 text-slate-950">
@@ -380,19 +385,15 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 {form.id ? '메모 수정' : '메모 작성'}
               </h2>
               {form.id ? (
-                <Button type="button" variant="ghost" size="sm" onClick={closeForm} icon={<X size={14} />}>
-                  취소
-                </Button>
+                <ModalCloseButton onClick={closeForm} label="수정 취소" className="-my-2 -mr-2" />
               ) : (
-                <Button type="button" variant="ghost" size="sm" onClick={closeForm} icon={<X size={14} />} className="lg:hidden">
-                  닫기
-                </Button>
+                <ModalCloseButton onClick={closeForm} label="작성 닫기" className="-my-2 -mr-2 lg:hidden" />
               )}
             </div>
 
             <div className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-black text-slate-600">제목</span>
+                <span className={labelClass}>제목</span>
                 <input
                   ref={titleRef}
                   value={form.title}
@@ -403,28 +404,68 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-xs font-black text-slate-600">내용</span>
+                <span className={labelClass}>내용</span>
                 <textarea
                   value={form.content}
                   onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
-                  className="min-h-[160px] w-full resize-y rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-medium leading-6 outline-none transition focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/15"
+                  className={fieldClass('h-auto min-h-[160px] resize-y py-2.5 leading-6')}
                   placeholder="메모 내용을 입력하세요."
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-xs font-black text-slate-600">카테고리</span>
-                <input
-                  value={form.category}
-                  onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value || '일반' }))}
-                  className={inputClass}
-                  placeholder="일반"
-                />
-              </label>
+              {/* The same chips as the list filter, single choice, with a free-text option at the end. */}
+              <div>
+                <span id="memo-category-label" className={labelClass}>카테고리</span>
+                <div role="radiogroup" aria-labelledby="memo-category-label" className="flex flex-wrap gap-1.5">
+                  {[...formCategories, ...(customCategory ? [customCategory] : [])].map((item) => {
+                    const selected = form.category === item && !customCategoryOpen
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => {
+                          setCustomCategoryOpen(false)
+                          setForm((prev) => ({ ...prev, category: item }))
+                        }}
+                        className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-bold transition-colors ${
+                          selected
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    aria-expanded={customCategoryOpen}
+                    onClick={() => setCustomCategoryOpen((open) => !open)}
+                    className={`inline-flex h-7 items-center gap-1 rounded-full border border-dashed px-3 text-xs font-bold transition-colors ${
+                      customCategoryOpen ? 'border-slate-900 text-slate-900' : 'border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <Plus size={12} />
+                    직접 입력
+                  </button>
+                </div>
+                {customCategoryOpen ? (
+                  <input
+                    autoFocus
+                    aria-label="카테고리 직접 입력"
+                    value={customCategory}
+                    onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value || '일반' }))}
+                    className={fieldClass('mt-2')}
+                    placeholder="새 카테고리 이름"
+                  />
+                ) : null}
+              </div>
 
               <div>
                 <div className="mb-1 flex items-center justify-between gap-3">
-                  <span className="text-xs font-black text-slate-600">색상</span>
+                  <span className="text-[12px] font-bold text-slate-700">색상</span>
                   <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-slate-700">
                     <input
                       type="checkbox"
@@ -458,7 +499,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 </summary>
                 <div className="space-y-3 pb-3 pt-1">
                   <label className="block">
-                    <span className="mb-1 block text-xs font-black text-slate-600">사이트 링크</span>
+                    <span className={labelClass}>사이트 링크</span>
                     <div className="relative">
                       <LinkIcon size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
@@ -472,7 +513,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
 
                   <div className="grid grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="mb-1 block text-xs font-black text-slate-600">아이디</span>
+                      <span className={labelClass}>아이디</span>
                       <div className="relative">
                         <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -484,7 +525,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       </div>
                     </label>
                     <label className="block">
-                      <span className="mb-1 block text-xs font-black text-slate-600">패스워드</span>
+                      <span className={labelClass}>패스워드</span>
                       <div className="relative">
                         <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -568,7 +609,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                         <button
                           type="button"
                           onClick={() => setNewAttachments((files) => files.filter((item) => getFileKey(item) !== getFileKey(file)))}
-                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          className={buttonClass('dangerGhost', 'icon', 'h-7 w-7 text-slate-400')}
                           aria-label={`${file.name} 첨부 취소`}
                         >
                           <X size={13} />
@@ -593,7 +634,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                         <button
                           type="button"
                           onClick={() => setKeepAttachmentIds((prev) => prev.filter((id) => id !== attachment.id))}
-                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          className={buttonClass('dangerGhost', 'icon', 'h-7 w-7 text-slate-400')}
                           aria-label={`${attachment.fileName} 삭제`}
                         >
                           <X size={13} />
@@ -645,7 +686,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
             </div>
 
             {/* Category is a second-level filter, so it reads as chips rather than another tab bar. */}
-            <div role="group" aria-label="카테고리" className="-mx-1 mt-3 flex flex-nowrap gap-1.5 overflow-x-auto px-1 pb-1">
+            <div role="group" aria-label="카테고리" className={`-mx-4 mt-3 flex flex-nowrap gap-1.5 overflow-x-auto px-4 pb-1 ${scrollFade}`}>
               {categories.map((item) => (
                 <button
                   key={item}
@@ -674,10 +715,10 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                     <article key={memo.id} className={`flex min-w-0 flex-col rounded-2xl border border-l-4 border-slate-200 bg-white p-4 shadow-sm ${color.accent}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">{memo.category}</span>
+                          <Badge outline className="max-w-full"><span className="truncate">{memo.category}</span></Badge>
                           {memo.pinned ? <Pin size={13} className="shrink-0 text-amber-600" aria-label="고정됨" /> : null}
                         </div>
-                        <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400">수정 {formatDate(memo.updatedAt)}</span>
+                        <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-500">수정 {formatDateTime(memo.updatedAt)}</span>
                       </div>
                       <h3 className="mt-2 line-clamp-2 text-base font-black leading-6 text-slate-950 break-keep">{memo.title}</h3>
 
@@ -788,21 +829,26 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                           </button>
                         </div>
                         <div className="flex gap-1">
+                          {/* On phones these shrink to icons so the gap between the two groups shows. */}
                           <button
                             type="button"
                             onClick={() => patchMemo(memo, { toggleArchived: true, archived: !memo.archived })}
-                            className={buttonClass('ghost', 'sm', 'px-2')}
+                            aria-label={memo.archived ? '복원' : '보관'}
+                            title={memo.archived ? '복원' : '보관'}
+                            className={buttonClass('ghost', 'sm', 'px-2 max-sm:w-9 max-sm:px-0')}
                           >
                             {memo.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
-                            {memo.archived ? '복원' : '보관'}
+                            <span className="max-sm:sr-only">{memo.archived ? '복원' : '보관'}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteMemo(memo)}
-                            className={buttonClass('ghost', 'sm', 'px-2 text-red-600 hover:bg-red-50')}
+                            aria-label="삭제"
+                            title="삭제"
+                            className={buttonClass('dangerGhost', 'sm', 'px-2 max-sm:w-9 max-sm:px-0')}
                           >
                             <Trash2 size={14} />
-                            삭제
+                            <span className="max-sm:sr-only">삭제</span>
                           </button>
                         </div>
                       </div>

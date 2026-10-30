@@ -10,6 +10,10 @@ import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 import Modal from '@/components/Modal'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import StatCard from '@/components/ui/StatCard'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
+import { formatDate, formatDateRange, formatDateTime } from '@/lib/format'
 
 /* ═══════════════════ Types ═══════════════════ */
 type CoupangPurchaseItemDetail = {
@@ -224,15 +228,7 @@ function resolveUsedAtTime(item: Pick<CardUsageItem, 'usedAt' | 'useDT'>) {
 /* ── Date / time formatting ── */
 function formatSyncTime(value: string | null) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  const y = d.getFullYear()
-  const m = d.getMonth() + 1
-  const day = d.getDate()
-  const ampm = d.getHours() < 12 ? '오전' : '오후'
-  const h = d.getHours() === 0 ? 12 : d.getHours() > 12 ? d.getHours() - 12 : d.getHours()
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}. ${m}. ${day}. ${ampm} ${h}:${min}`
+  return Number.isNaN(new Date(value).getTime()) ? value : formatDateTime(value)
 }
 
 function formatAmPmTime(value: string | null) {
@@ -266,11 +262,16 @@ function getDateKey(value: string | null) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function formatDisplayDate(input: string) {
-  if (!input) return ''
-  const parts = input.split('-')
-  if (parts.length !== 3) return input
-  return `${parts[0]}. ${parts[1]}. ${parts[2]}`
+// Filter dates are YYYY-MM-DD; read them as local days so the range never shifts by a timezone.
+function parseLocalDate(input: string) {
+  const [y, m, d] = input.split('-').map(Number)
+  return y && m && d ? new Date(y, m - 1, d) : null
+}
+
+function formatDisplayRange(start: string, end: string) {
+  const a = parseLocalDate(start)
+  const b = parseLocalDate(end)
+  return a && b ? formatDateRange(a, b) : `${start} – ${end}`
 }
 
 function parseSearchQuery(q: string): { text: string; minAmount: number | null; maxAmount: number | null } {
@@ -936,7 +937,7 @@ export default function CardUsageClient() {
     if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
       return `${start.getFullYear()}년 ${start.getMonth() + 1}월`
     }
-    return `${formatDisplayDate(startDate)} ~ ${formatDisplayDate(endDate)}`
+    return formatDisplayRange(startDate, endDate)
   }, [startDate, endDate])
   const daysInRange = useMemo(() => {
     const s = new Date(startDate); const e = new Date(endDate)
@@ -1226,12 +1227,8 @@ export default function CardUsageClient() {
     paddingRight: 12,
   }
 
-  const kpiLabelStyle: React.CSSProperties = { fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 600 }
-  const kpiValueStyle: React.CSSProperties = { fontSize: 24, fontWeight: 800, color: T.text, margin: '6px 0 6px', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }
-  const kpiUnitStyle: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: T.textSecondary, marginLeft: 1 }
 
   // Same white field as the search bar and the rest of the console.
-  const filterSelectClass = 'h-10 w-full min-w-0 cursor-pointer appearance-none truncate rounded-[10px] border border-[var(--input-border)] bg-[var(--input-bg)] pl-3 pr-8 text-[13px] text-[var(--foreground)] transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15'
   const filterFieldClass = 'flex h-10 min-w-0 items-center gap-2 rounded-[10px] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/15'
   const filterBareInputClass = 'min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-[13px] tabular-nums text-[var(--foreground)] focus:shadow-none focus:outline-none'
   const shortcutTipsAvailable = viewMode !== 'calendar' && sortedItems.length > 0 && shortcutCategories.length > 0
@@ -1251,6 +1248,7 @@ export default function CardUsageClient() {
               loading={lotteSyncing}
               icon={<RefreshCw size={14} />}
               title="이미 로그인된 롯데카드 디버그 브라우저에서 이용내역을 직접 수집"
+              className="flex-1 lg:flex-none"
             >
               롯데카드 동기화
             </Button>
@@ -1261,13 +1259,14 @@ export default function CardUsageClient() {
               loading={coupangSyncing}
               icon={<Link2 size={14} />}
               title="쿠팡 로그인하여 구매내역 가져오기 + 카드결제와 자동매칭"
+              className="flex-1 lg:flex-none"
             >
               쿠팡 매칭
             </Button>
-            {/* 즉시조회 only changes 바로빌 동기화, so it sits with that button; on phones this pair comes first at full width. */}
-            <div className="order-first flex w-full items-center gap-3 lg:order-none lg:w-auto">
+            {/* 즉시조회 only changes 바로빌 동기화, so the pair stays tight and keeps a wider gap from the other buttons; on phones it comes first at full width. */}
+            <div data-primary className="order-first flex w-full items-center gap-2 lg:order-none lg:ml-3 lg:w-auto">
               <label
-                className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--muted-foreground)]"
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-slate-700"
                 title="동기화 전에 카드사에 최신 승인내역 조회를 먼저 요청합니다"
               >
                 <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} className="h-4 w-4 accent-brand-orange" />
@@ -1314,37 +1313,38 @@ export default function CardUsageClient() {
       {/* Coupang sync modal */}
       {coupangModalOpen && (
         <Modal labelledBy="coupang-login-title" onClose={() => { if (!coupangSyncing) setCoupangModalOpen(false) }} className="bg-slate-950/50">
-          <div className="flex h-full items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget && !coupangSyncing) setCoupangModalOpen(false) }}>
+          <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget && !coupangSyncing) setCoupangModalOpen(false) }}>
             <div
+              className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl sm:w-[420px] sm:rounded-2xl"
               style={{
-                background: T.surface, borderRadius: 16, padding: 24,
-                width: 'min(420px, 92vw)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                background: T.surface, padding: 24,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
                 border: `1px solid ${T.border}`,
               }}
             >
-              <h2 id="coupang-login-title" style={{ fontSize: 16, fontWeight: 800, color: T.text, margin: '0 0 6px' }}>쿠팡 로그인</h2>
+              <div className="mb-1.5 flex items-start justify-between gap-3">
+                <h2 id="coupang-login-title" className="text-[18px] font-extrabold" style={{ color: T.text, margin: 0 }}>쿠팡 로그인</h2>
+                <ModalCloseButton onClick={() => { if (!coupangSyncing) setCoupangModalOpen(false) }} className="-mr-2 -mt-1.5" />
+              </div>
               <p className="break-keep" style={{ fontSize: 12, color: T.textTertiary, margin: '0 0 16px', lineHeight: 1.5 }}>
-                조회 기간({formatDisplayDate(startDate)} ~ {formatDisplayDate(endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
+                조회 기간({formatDisplayRange(startDate, endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
                 비밀번호는 한 번의 로그인에만 사용되며 어디에도 저장되지 않습니다.
               </p>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 *</label>
+              <label htmlFor="coupang-login-id" className={labelClass}>쿠팡 아이디 *</label>
               <input
+                id="coupang-login-id"
                 type="text"
                 value={coupangLoginId}
                 onChange={(e) => setCoupangLoginId(e.target.value)}
                 placeholder="아이디 또는 이메일"
                 required
-                className="focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
-                style={{
-                  width: '100%', height: 40, padding: '0 12px', borderRadius: 10,
-                  border: `1px solid ${T.inputBorder}`, background: T.surface, color: T.text,
-                  fontSize: 13, marginBottom: 12,
-                }}
+                className={fieldClass('mb-3')}
                 autoComplete="username"
                 autoFocus
               />
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.textSecondary, marginBottom: 4 }}>쿠팡 비밀번호 *</label>
+              <label htmlFor="coupang-login-password" className={labelClass}>쿠팡 비밀번호 *</label>
               <input
+                id="coupang-login-password"
                 type="password"
                 value={coupangPassword}
                 onChange={(e) => setCoupangPassword(e.target.value)}
@@ -1356,12 +1356,7 @@ export default function CardUsageClient() {
                 }}
                 placeholder="비밀번호"
                 required
-                className="focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
-                style={{
-                  width: '100%', height: 40, padding: '0 12px', borderRadius: 10,
-                  border: `1px solid ${T.inputBorder}`, background: T.surface, color: T.text,
-                  fontSize: 13, marginBottom: 12,
-                }}
+                className={fieldClass('mb-3')}
                 autoComplete="current-password"
               />
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.textTertiary, marginBottom: 16, cursor: 'pointer' }}>
@@ -1399,50 +1394,33 @@ export default function CardUsageClient() {
       )}
 
       {/* ════════ Metric Cards ════════ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" style={{ marginBottom: 8 }}>
-        {/* 이번 달 총 지출 */}
-        <div className="col-span-2 sm:col-span-1" style={{ ...cardStyle, padding: '18px 20px' }}>
-          <p style={kpiLabelStyle}>조회 기간 확인된 지출</p>
-          <p style={kpiValueStyle}>
-            {totalAmount.toLocaleString()}<span style={kpiUnitStyle}>원</span>
-          </p>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>
-            {formatDisplayDate(startDate)} — {formatDisplayDate(endDate).split('. ').slice(1).join('. ')}
-          </p>
-        </div>
-
-        {/* 거래 건수 */}
-        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
-          <p style={kpiLabelStyle}>거래 건수</p>
-          <p style={kpiValueStyle}>
-            {totalCount.toLocaleString()}<span style={kpiUnitStyle}>건</span>
-          </p>
-          {(amountResolvedCount > 0 || amountMissingCount > 0) && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {amountResolvedCount > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
-                  background: T.successBg, color: T.success, border: `1px solid ${T.successBorder}`,
-                }}>금액확인 {amountResolvedCount}건</span>
-              )}
-              {amountMissingCount > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
-                  background: T.warningBg, color: T.warning, border: `1px solid ${T.warningBorder}`,
-                }}>미확인 {amountMissingCount}건</span>
-              )}
-            </div>
+      {/* Every card keeps a caption line, so the three read with the same rhythm even at 0건. */}
+      <div className="mb-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatCard
+          className="col-span-2 sm:col-span-1"
+          label="조회 기간 확인된 지출"
+          value={totalAmount.toLocaleString()}
+          unit="원"
+          caption={formatDisplayRange(startDate, endDate)}
+        />
+        <StatCard
+          label="거래 건수"
+          value={totalCount.toLocaleString()}
+          unit="건"
+          caption={(
+            <>
+              금액확인 <span className="tabular-nums">{amountResolvedCount.toLocaleString()}</span>
+              {' · '}
+              <span className={amountMissingCount > 0 ? 'font-bold text-amber-700' : ''}>미확인 <span className="tabular-nums">{amountMissingCount.toLocaleString()}</span></span>
+            </>
           )}
-        </div>
-
-        {/* 일평균 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
-          <p style={kpiLabelStyle}>확인된 일평균 지출</p>
-          <p style={kpiValueStyle}>
-            {dailyAvg.toLocaleString()}<span style={kpiUnitStyle}>원</span>
-          </p>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>{daysInRange}일 기준</p>
-        </div>
+        />
+        <StatCard
+          label="확인된 일평균 지출"
+          value={dailyAvg.toLocaleString()}
+          unit="원"
+          caption={`${daysInRange}일 기준`}
+        />
       </div>
       <p className="mb-4 break-keep text-xs" style={{ color: T.textTertiary }}>
         저장된 카드 내역 기준입니다. 마지막 동기화 이후 거래는 빠질 수 있고, 0원은 미수집일 수 있으니 확인한 뒤 판단해 주세요.
@@ -1736,63 +1714,17 @@ export default function CardUsageClient() {
       )}
 
       {/* ════════ Filter bar ════════ */}
-      {/* Phones: two columns, with the period and 조회 on their own full-width rows. */}
+      {/* Phones follow the DOM order: [월 | 조회], the period right under the month, then the other filters. */}
       <div className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <div className="relative min-w-0 sm:w-40">
           <select
             aria-label="월 선택"
             value={selectedMonth}
             onChange={e => handleMonthChange(e.target.value)}
-            className={filterSelectClass}
+            className={selectClass(Boolean(selectedMonth), 'min-w-0 cursor-pointer appearance-none truncate')}
           >
             {!selectedMonth && <option value="">기간 직접 선택</option>}
             {monthOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-        </div>
-
-        <div className={`${filterFieldClass} order-1 col-span-2 sm:order-none sm:min-w-[300px] sm:flex-1`}>
-          <input
-            ref={startDateInputRef}
-            type="date"
-            aria-label="시작일"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            onClick={() => openNativePicker(startDateInputRef.current)}
-            className={filterBareInputClass}
-          />
-          <span aria-hidden="true" className="shrink-0 text-[13px] text-[var(--muted-foreground)]">—</span>
-          <input
-            ref={endDateInputRef}
-            type="date"
-            aria-label="종료일"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            onClick={() => openNativePicker(endDateInputRef.current)}
-            className={filterBareInputClass}
-          />
-        </div>
-
-        <div className="relative min-w-0 sm:min-w-[170px]">
-          <select aria-label="카드번호" value={cardNum} onChange={e => setCardNum(e.target.value)} className={filterSelectClass}>
-            <option value="">카드번호 전체</option>
-            {uniqueCards.map(c => <option key={c} value={c}>{maskCard(c)}</option>)}
-          </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-        </div>
-
-        <div className="relative min-w-0 sm:min-w-[170px]">
-          <select aria-label="가맹점" value={storeName} onChange={e => setStoreName(e.target.value)} className={filterSelectClass}>
-            <option value="">가맹점 전체</option>
-            {uniqueStores.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-        </div>
-
-        <div className="relative min-w-0 sm:min-w-[150px]">
-          <select aria-label="카테고리" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={filterSelectClass}>
-            <option value="">카테고리 전체</option>
-            {categories.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
           </select>
           <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
         </div>
@@ -1803,10 +1735,56 @@ export default function CardUsageClient() {
           onClick={handleSearch}
           loading={loading}
           icon={<Search size={14} />}
-          className="order-2 col-span-2 min-w-[72px] sm:order-none"
+          className="min-w-[72px] sm:order-last"
         >
           조회
         </Button>
+
+        <div className={`${filterFieldClass} col-span-2 sm:min-w-[300px] sm:flex-1`}>
+          <input
+            ref={startDateInputRef}
+            type="date"
+            aria-label="시작일"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            onClick={() => openNativePicker(startDateInputRef.current)}
+            className={`${filterBareInputClass} ${startDate ? '' : 'text-slate-400'}`}
+          />
+          <span aria-hidden="true" className="shrink-0 text-[13px] text-[var(--muted-foreground)]">—</span>
+          <input
+            ref={endDateInputRef}
+            type="date"
+            aria-label="종료일"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            onClick={() => openNativePicker(endDateInputRef.current)}
+            className={`${filterBareInputClass} ${endDate ? '' : 'text-slate-400'}`}
+          />
+        </div>
+
+        <div className="relative min-w-0 sm:min-w-[170px]">
+          <select aria-label="카드번호" value={cardNum} onChange={e => setCardNum(e.target.value)} className={selectClass(Boolean(cardNum), 'min-w-0 cursor-pointer appearance-none truncate')}>
+            <option value="">카드번호 전체</option>
+            {uniqueCards.map(c => <option key={c} value={c}>{maskCard(c)}</option>)}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+        </div>
+
+        <div className="relative min-w-0 sm:min-w-[170px]">
+          <select aria-label="가맹점" value={storeName} onChange={e => setStoreName(e.target.value)} className={selectClass(Boolean(storeName), 'min-w-0 cursor-pointer appearance-none truncate')}>
+            <option value="">가맹점 전체</option>
+            {uniqueStores.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+        </div>
+
+        <div className="relative col-span-2 min-w-0 sm:min-w-[150px]">
+          <select aria-label="카테고리" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={selectClass(Boolean(categoryFilter), 'min-w-0 cursor-pointer appearance-none truncate')}>
+            <option value="">카테고리 전체</option>
+            {categories.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+        </div>
       </div>
 
       {/* ════════ Unified search bar ════════ */}
@@ -1915,22 +1893,23 @@ export default function CardUsageClient() {
               미리뷰만 보기
             </button>
           )}
+          {/* A real switch: the track shows on/off, so the label never has to. */}
           <button
             type="button"
-            aria-pressed={reviewMode}
+            role="switch"
+            aria-checked={reviewMode}
             onClick={() => {
               setReviewMode(prev => {
                 if (prev) setReviewOnlyPending(false)
                 return !prev
               })
             }}
-            className={`inline-flex h-8 items-center whitespace-nowrap rounded-lg border px-3 text-xs font-bold transition-colors ${
-              reviewMode
-                ? 'border-slate-400 bg-slate-100 text-slate-900'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-            }`}
+            className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg px-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
           >
-            리뷰 모드 {reviewMode ? '켜짐' : '꺼짐'}
+            <span aria-hidden="true" className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${reviewMode ? 'bg-slate-900' : 'bg-slate-300'}`}>
+              <span className={`absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${reviewMode ? 'translate-x-4' : ''}`} />
+            </span>
+            리뷰 모드
           </button>
           <label className="relative inline-flex items-center" title={viewMode === 'calendar' ? '캘린더 보기에는 정렬이 적용되지 않습니다' : undefined}>
             <span className="sr-only">정렬</span>
@@ -1948,15 +1927,16 @@ export default function CardUsageClient() {
             </select>
             <ChevronDown size={13} className="pointer-events-none absolute right-2 text-slate-400" />
           </label>
-          <div ref={shortcutTipsRef} className={`relative ${shortcutTipsAvailable ? '' : 'invisible'}`}>
+          {/* Always rendered (disabled when it can't help) so the row's right edge never moves. */}
+          <div ref={shortcutTipsRef} className="relative">
             <button
               type="button"
               onClick={() => setShowShortcutTips(prev => !prev)}
               aria-expanded={showShortcutTips}
               aria-label="단축키 팁"
-              title="단축키 팁"
-              tabIndex={shortcutTipsAvailable ? undefined : -1}
-              className={buttonClass('ghost', 'sm', 'w-8 px-0')}
+              title={shortcutTipsAvailable ? '단축키 팁' : viewMode === 'calendar' ? '캘린더 보기에서는 단축키를 쓸 수 없습니다' : '거래가 있을 때 쓸 수 있습니다'}
+              disabled={!shortcutTipsAvailable}
+              className={buttonClass('ghost', 'icon')}
             >
               <Keyboard size={16} />
             </button>
@@ -2553,17 +2533,17 @@ export default function CardUsageClient() {
         const closeManualMatch = () => setCoupangManualOpenForId(null)
         return (
           <Modal labelledBy="coupang-manual-title" onClose={closeManualMatch} className="bg-slate-950/50">
-            <div className="flex h-full items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget) closeManualMatch() }}>
+            <div className="flex h-full items-end justify-center sm:items-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) closeManualMatch() }}>
               <div
+                className="max-h-[92dvh] w-full overflow-auto rounded-t-2xl sm:max-h-[80vh] sm:w-[560px] sm:rounded-2xl"
                 style={{
-                  background: T.surface, borderRadius: 16, padding: 22,
-                  width: 'min(560px, 94vw)', maxHeight: '80vh', overflow: 'auto',
+                  background: T.surface, padding: 22,
                   boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: `1px solid ${T.border}`,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
                   <div>
-                    <h2 id="coupang-manual-title" style={{ fontSize: 16, fontWeight: 800, color: T.text, margin: 0 }}>쿠팡 구매내역 매칭</h2>
+                    <h2 id="coupang-manual-title" className="text-[18px] font-extrabold" style={{ color: T.text, margin: 0 }}>쿠팡 구매내역 매칭</h2>
                     {targetItem && (
                       <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
                         {targetItem.useStoreName || '가맹점 없음'} · {resolveAmount(targetItem).toLocaleString()}원
@@ -2571,9 +2551,7 @@ export default function CardUsageClient() {
                       </p>
                     )}
                   </div>
-                  <button type="button" onClick={closeManualMatch} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}>
-                    <X size={16} />
-                  </button>
+                  <ModalCloseButton onClick={closeManualMatch} className="-mr-2 -mt-1.5" />
                 </div>
                 {coupangManualLoading ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
@@ -2602,7 +2580,7 @@ export default function CardUsageClient() {
                               {purchase.itemSummary || '쿠팡 주문'}
                             </p>
                             <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0' }}>
-                              주문 {purchase.orderId} · {new Date(purchase.orderedAt).toLocaleDateString('ko-KR')} · {purchase.totalAmount.toLocaleString()}원
+                              주문 {purchase.orderId} · {formatDate(purchase.orderedAt)} · {purchase.totalAmount.toLocaleString()}원
                               {purchase.paymentMethod ? ` · ${purchase.paymentMethod}` : ''}
                             </p>
                           </div>
