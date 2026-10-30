@@ -5,6 +5,8 @@ import { redirect } from "next/navigation"
 import { unstable_cache } from "next/cache"
 import ProformaClient, { type IssuedInvoice, type PartnerOption, type ProductOption } from "./ProformaClient"
 
+export const metadata = { title: 'PI 발급' }
+
 export const dynamic = 'force-dynamic'
 
 const getCachedProformaPageData = unstable_cache(

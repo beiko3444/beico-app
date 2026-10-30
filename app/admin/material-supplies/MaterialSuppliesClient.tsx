@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CheckCircle2, ExternalLink, PackagePlus, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ExternalLink, PackagePlus, Pencil, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react'
 import { getMaterialSupplyUnitPrice } from '@/lib/materialSupplies'
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
@@ -10,6 +10,9 @@ import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/Modal'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
+import { formatDateTime, formatWon } from '@/lib/format'
 
 export type MaterialSupplyItem = {
   id: string
@@ -73,11 +76,6 @@ const emptyForm = (): FormState => ({
   active: true,
 })
 
-const formatCurrency = (value: number | null) => {
-  if (!value) return '-'
-  return `${value.toLocaleString()}원`
-}
-
 const parsePriceInput = (value: string) => {
   const parsed = Number(value.replace(/[^0-9.-]/g, ''))
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
@@ -93,13 +91,6 @@ const formatDimension = (item: Pick<MaterialSupplyItem, 'widthValue' | 'depthVal
   const values = [item.widthValue, item.depthValue, item.heightValue]
   if (values.some((value) => !value || value <= 0)) return ''
   return `${values.map((value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })).join(' x ')} ${item.dimensionUnit || 'mm'}`
-}
-
-const formatDateTime = (value: string | null) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 export default function MaterialSuppliesClient({ initialItems }: { initialItems: MaterialSupplyItem[] }) {
@@ -242,7 +233,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
         title="부자재 주문"
         count={items.length}
         description="자주 구매하는 품목을 빠르게 찾고 재주문합니다."
-        actions={<Button variant="primary" onClick={openNewForm} icon={<Plus size={15} />}>새 부자재</Button>}
+        actions={<Button data-primary variant="primary" onClick={openNewForm} icon={<Plus size={15} />}>새 부자재</Button>}
       />
 
       <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -255,7 +246,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="부자재명 · 카테고리 · 구매처 검색"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-[13px] font-medium text-slate-900 transition focus:border-brand-orange focus:bg-white"
+              className={fieldClass('pl-9')}
             />
           </label>
           <Tabs
@@ -263,7 +254,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
             items={activeFilterItems.map((item) => ({ ...item, count: filterCounts[item.key] }))}
             value={activeFilter}
             onChange={setActiveFilter}
-            className="shrink-0"
+            className="shrink-0 self-start lg:self-auto"
           />
         </div>
 
@@ -302,33 +293,38 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                       <button
                         type="button"
                         onClick={() => editItem(item)}
-                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500 hover:text-slate-900')}
+                        className={buttonClass('ghost', 'icon', 'text-slate-500 hover:text-slate-900')}
                         title="수정"
                         aria-label={`${item.name} 수정`}
                       >
-                        <Pencil size={14} />
+                        <Pencil size={16} />
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteItem(item)}
                         disabled={busyId === item.id}
-                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500 hover:bg-red-50 hover:text-red-600')}
+                        className={buttonClass('dangerGhost', 'icon')}
                         title="삭제"
                         aria-label={`${item.name} 삭제`}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
 
                   <div className={`mt-2 border-t border-slate-100 pt-2 ${item.active ? '' : 'opacity-60'}`}>
-                    <p className="truncate text-[11px] font-bold text-slate-500">{supplierLine || '구매처 미입력'}</p>
+                    {/* Missing values stay small and grey so they never outweigh real prices. */}
+                    {!supplierLine && !item.priceKrw ? (
+                      <p className="text-[11px] font-bold text-slate-400">구매처·가격 미입력</p>
+                    ) : (
+                      <p className={`truncate text-[11px] font-bold ${supplierLine ? 'text-slate-500' : 'text-slate-400'}`}>{supplierLine || '구매처 미입력'}</p>
+                    )}
                     <div className="mt-0.5 flex items-baseline justify-between gap-2">
                       {item.priceKrw ? (
-                        <p className="text-[15px] font-black tabular-nums text-slate-900">{formatCurrency(item.priceKrw)}</p>
-                      ) : (
-                        <p className="text-[13px] font-bold text-slate-400">가격 미입력</p>
-                      )}
+                        <p className="text-[15px] font-black tabular-nums text-slate-900">{formatWon(item.priceKrw)}</p>
+                      ) : supplierLine ? (
+                        <p className="text-[11px] font-bold text-slate-400">가격 미입력</p>
+                      ) : null}
                       {unitPrice ? (
                         <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black tabular-nums text-slate-600">
                           개당 {(Math.round(unitPrice * 10) / 10).toLocaleString()}원
@@ -380,13 +376,13 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
             className="mt-3"
             icon={<PackagePlus size={20} />}
             title="조건에 맞는 부자재가 없습니다."
-            action={<Button variant="secondary" size="sm" onClick={openNewForm} icon={<Plus size={13} />}>새 부자재</Button>}
+            description="상단의 ‘새 부자재’로 등록하세요."
           />
         )}
       </section>
 
       {formOpen ? (
-        <Modal label={form.id ? '부자재 수정' : '새 부자재'} onClose={() => setFormOpen(false)} className="bg-slate-950/40">
+        <Modal label={form.id ? '부자재 수정' : '새 부자재'} onClose={() => setFormOpen(false)} className="bg-slate-950/50">
           <div
             className="flex h-full w-full justify-end"
             onMouseDown={(event) => { if (event.target === event.currentTarget) setFormOpen(false) }}
@@ -398,19 +394,11 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                     <ShoppingCart size={16} />
                   </span>
                   <div>
-                    <h2 className="text-[14px] font-black text-slate-950">{form.id ? '부자재 수정' : '새 부자재'}</h2>
-                    <p className="text-[11px] font-bold text-slate-500">필요한 정보만 빠르게 입력하세요.</p>
+                    <h2 className="text-lg font-extrabold leading-tight text-slate-950">{form.id ? '부자재 수정' : '새 부자재'}</h2>
+                    <p className="text-xs text-slate-500">필요한 정보만 빠르게 입력하세요.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0 text-slate-500')}
-                  title="닫기"
-                  aria-label="닫기"
-                >
-                  <X size={16} />
-                </button>
+                <ModalCloseButton onClick={() => setFormOpen(false)} />
               </div>
 
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
@@ -436,10 +424,10 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                     <input className={inputClass} value={form.unit} onChange={(event) => setFormValue('unit', event.target.value)} placeholder="100개" />
                   </Field>
                   <Field label="가격">
-                    <input inputMode="numeric" className={`${inputClass} text-right tabular-nums`} value={form.priceKrw} onChange={(event) => setFormValue('priceKrw', event.target.value)} placeholder="12500" />
+                    <input inputMode="numeric" className={fieldClass('px-2.5 text-right tabular-nums')} value={form.priceKrw} onChange={(event) => setFormValue('priceKrw', event.target.value)} placeholder="12500" />
                   </Field>
                   <Field label="정렬(표시순서)">
-                    <input inputMode="numeric" className={`${inputClass} text-right tabular-nums`} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
+                    <input inputMode="numeric" className={fieldClass('px-2.5 text-right tabular-nums')} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
                   </Field>
                 </div>
                 <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-[12px] font-bold">
@@ -450,7 +438,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                   <div className="mb-1.5 flex items-center justify-between gap-3">
                     <span className="text-[11px] font-black text-slate-500">규격 (선택)</span>
                     <select
-                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-bold text-slate-700"
+                      className={selectClass(true, 'h-8 w-auto px-2 pr-7 text-[12px]')}
                       value={form.dimensionUnit}
                       onChange={(event) => setFormValue('dimensionUnit', event.target.value === 'cm' ? 'cm' : 'mm')}
                       aria-label="규격 단위"
@@ -461,18 +449,18 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
                     <Field label="가로">
-                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.widthValue} onChange={(event) => setFormValue('widthValue', event.target.value)} placeholder="0" />
+                      <input inputMode="decimal" className={fieldClass('px-2.5 text-right tabular-nums')} value={form.widthValue} onChange={(event) => setFormValue('widthValue', event.target.value)} placeholder="0" />
                     </Field>
                     <Field label="세로">
-                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.depthValue} onChange={(event) => setFormValue('depthValue', event.target.value)} placeholder="0" />
+                      <input inputMode="decimal" className={fieldClass('px-2.5 text-right tabular-nums')} value={form.depthValue} onChange={(event) => setFormValue('depthValue', event.target.value)} placeholder="0" />
                     </Field>
                     <Field label="높이">
-                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.heightValue} onChange={(event) => setFormValue('heightValue', event.target.value)} placeholder="0" />
+                      <input inputMode="decimal" className={fieldClass('px-2.5 text-right tabular-nums')} value={form.heightValue} onChange={(event) => setFormValue('heightValue', event.target.value)} placeholder="0" />
                     </Field>
                   </div>
                 </div>
                 <Field label="메모">
-                  <textarea className={`${inputClass} h-auto min-h-16 resize-none py-2`} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="주의사항, 대체 구매처 등" />
+                  <textarea className={fieldClass('h-auto min-h-16 resize-none px-2.5 py-2')} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="주의사항, 대체 구매처 등" />
                 </Field>
                 <label className="flex min-h-10 items-center justify-between border-t border-slate-100 pt-3 text-[12px] font-bold text-slate-700">
                   사용중으로 표시
@@ -480,11 +468,14 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                 </label>
               </div>
 
-              <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-3">
-                <Button variant="secondary" onClick={() => setForm(emptyForm())}>
+              <div className="flex shrink-0 items-center gap-2 border-t border-slate-100 bg-white px-4 py-3">
+                <Button variant="ghost" onClick={() => setForm(emptyForm())} className="mr-auto">
                   초기화
                 </Button>
-                <Button variant="primary" onClick={submitForm} loading={saving} className="flex-1">
+                <Button variant="secondary" onClick={() => setFormOpen(false)}>
+                  취소
+                </Button>
+                <Button variant="primary" onClick={submitForm} loading={saving}>
                   {saving ? '저장 중' : form.id ? '수정 저장' : '등록'}
                 </Button>
               </div>
@@ -499,10 +490,10 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-black text-slate-500">{label}</span>
+      <span className={labelClass}>{label}</span>
       {children}
     </label>
   )
 }
 
-const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-[13px] font-medium text-slate-950 transition focus:border-brand-orange'
+const inputClass = fieldClass('px-2.5')

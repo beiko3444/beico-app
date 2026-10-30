@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react'
 import { FileDown, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { buttonClass } from '@/components/ui/buttonClass'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
+import { fieldClass, labelClass as fieldLabelClass, selectClass } from '@/components/ui/field'
+import { formatDateTime } from '@/lib/format'
 import type { CargoFaxLogRecord, CargoFaxRecipientRecord, CargoProxyRecord } from '@/lib/cargoDeliveryProxy'
 
 type Props = {
@@ -18,9 +21,8 @@ type CheckResult = {
     ftp: { ok: boolean; host: string; user: string; message?: string }
 }
 
-const inputClass =
-    'mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white'
-const labelClass = 'text-[11px] font-bold text-slate-600 dark:text-gray-400'
+const inputClass = fieldClass('placeholder:text-slate-300 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white')
+const labelClass = fieldLabelClass
 
 const formatFaxNumber = (value: string) => {
     const digits = value.replace(/[^0-9]/g, '')
@@ -30,17 +32,11 @@ const formatFaxNumber = (value: string) => {
     return value
 }
 
-const formatDateTime = (iso: string) => {
-    const date = new Date(iso)
-    if (Number.isNaN(date.getTime())) return iso
-    return date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
 // 바로빌 SendState: 0~2 진행중, 3 전송완료(결과코드 802만 성공), 4 예약취소, 5 변환실패, 6 전송실패, 7 부분성공, 8 용량초과
-const stateBadgeClass = (log: CargoFaxLogRecord) => {
-    const failed = 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
-    const success = 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-    const pending = 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+const stateTone = (log: CargoFaxLogRecord): BadgeTone => {
+    const failed = 'danger'
+    const success = 'success'
+    const pending = 'warning'
     if (log.error) return failed
     switch (log.sendState) {
         case 3:
@@ -276,7 +272,7 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                     <select
                         value={selectedRecipientId}
                         onChange={(event) => applyRecipient(event.target.value)}
-                        className={inputClass}
+                        className={selectClass(!!selectedRecipientId, 'dark:border-[#2a2a2a] dark:bg-[#1e1e1e]')}
                     >
                         <option value="">직접 입력</option>
                         {recipients.map((recipient) => (
@@ -288,11 +284,11 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                 </div>
                 <div>
                     <label className={labelClass}>수신처 이름</label>
-                    <input type="text" value={toName} onChange={(event) => setToName(event.target.value)} className={inputClass} placeholder="○○물류 / 포워더" />
+                    <input type="text" value={toName} onChange={(event) => setToName(event.target.value)} className={inputClass} placeholder="예: ○○물류 / 포워더" />
                 </div>
                 <div>
                     <label className={labelClass}>수신 팩스번호</label>
-                    <input type="tel" value={toNumber} onChange={(event) => setToNumber(event.target.value)} className={inputClass} placeholder="051-000-0000" />
+                    <input type="tel" value={toNumber} onChange={(event) => setToNumber(event.target.value)} className={inputClass} placeholder="예: 051-000-0000" />
                 </div>
             </div>
             <div className="flex justify-end">
@@ -310,7 +306,7 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                         </div>
                         <div>
                             <label className={labelClass}>팩스번호</label>
-                            <input type="tel" value={recipientForm.faxNumber} onChange={(event) => setRecipientForm((prev) => ({ ...prev, faxNumber: event.target.value }))} className={inputClass} placeholder="051-000-0000" />
+                            <input type="tel" value={recipientForm.faxNumber} onChange={(event) => setRecipientForm((prev) => ({ ...prev, faxNumber: event.target.value }))} className={inputClass} placeholder="예: 051-000-0000" />
                         </div>
                         <button type="button" onClick={handleSaveRecipient} disabled={isSavingRecipient} className={buttonClass('secondary', 'md')}>
                             {isSavingRecipient ? '저장 중...' : '저장'}
@@ -321,8 +317,8 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                             {recipients.map((recipient) => (
                                 <span key={recipient.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300">
                                     {recipient.name} · {formatFaxNumber(recipient.faxNumber)}
-                                    <button type="button" onClick={() => void handleDeleteRecipient(recipient)} className="text-slate-400 hover:text-red-600" title="삭제" aria-label={`${recipient.name} 수신처 삭제`}>
-                                        <Trash2 size={11} />
+                                    <button type="button" onClick={() => void handleDeleteRecipient(recipient)} className={buttonClass('dangerGhost', 'icon', 'h-6 w-6 rounded-full')} title="삭제" aria-label={`${recipient.name} 수신처 삭제`}>
+                                        <Trash2 size={13} />
                                     </button>
                                 </span>
                             ))}
@@ -332,9 +328,9 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
             )}
 
             <div className="flex items-center justify-between">
-                <span className={labelClass}>전송 내역 ({proxyLogs.length})</span>
+                <span className="text-[12px] font-bold text-slate-700 dark:text-gray-300">전송 내역 ({proxyLogs.length})</span>
                 <button type="button" onClick={handleRefresh} disabled={isRefreshing} className={buttonClass('ghost', 'sm')}>
-                    <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} /> 상태 새로고침
+                    <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} /> 상태 새로고침
                 </button>
             </div>
             {proxyLogs.length === 0 ? (
@@ -357,7 +353,7 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-gray-300">{formatDateTime(log.createdAt)}</td>
                                     <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-gray-300">{log.toName} · {formatFaxNumber(log.toNumber)}</td>
                                     <td className="whitespace-nowrap px-3 py-2">
-                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${stateBadgeClass(log)}`}>{log.sendStateLabel}</span>
+                                        <Badge tone={stateTone(log)}>{log.sendStateLabel}</Badge>
                                     </td>
                                     <td className="break-all px-3 py-2 text-slate-600 dark:text-gray-400">
                                         {log.error
@@ -368,8 +364,8 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                                               ].filter(Boolean).join(' · ') || '-'}
                                     </td>
                                     <td className="px-3 py-2 text-center">
-                                        <button type="button" onClick={() => void handleDeleteLog(log)} className="rounded p-1 text-slate-400 hover:text-red-600" title="내역 삭제" aria-label="전송 내역 삭제">
-                                            <Trash2 size={12} />
+                                        <button type="button" onClick={() => void handleDeleteLog(log)} className={buttonClass('dangerGhost', 'icon')} title="내역 삭제" aria-label="전송 내역 삭제">
+                                            <Trash2 size={16} />
                                         </button>
                                     </td>
                                 </tr>

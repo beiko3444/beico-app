@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { buildExportProductPrices, resolveExportUnitPriceUsd } from '@/lib/exportDeclarationPricing'
 import ExportDeclarationClient, { type ExportDeclarationListItem, type ExportProductOption } from './ExportDeclarationClient'
 
+export const metadata = { title: '수출신고' }
+
 export const dynamic = 'force-dynamic'
 
 const readNumber = (value: unknown): number => {

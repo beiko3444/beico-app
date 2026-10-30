@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { ensurePurchase1688Seeded } from '@/lib/purchase1688'
 import Purchase1688Client, { type Purchase1688Item } from './Purchase1688Client'
 
+export const metadata = { title: '1688 구매내역' }
+
 export const dynamic = 'force-dynamic'
 
 export default async function Purchase1688Page() {

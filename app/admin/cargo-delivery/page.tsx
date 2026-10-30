@@ -13,6 +13,8 @@ import {
 import { describeBarobillFaxLog, describeBarobillFaxResult } from "@/lib/barobillFax"
 import CargoDeliveryClient from "./CargoDeliveryClient"
 
+export const metadata = { title: '인도 위임장' }
+
 export const dynamic = 'force-dynamic'
 
 export default async function CargoDeliveryPage() {

@@ -7,6 +7,9 @@ import Badge from '@/components/ui/Badge'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import { fieldClass, selectClass } from '@/components/ui/field'
+import { formatDateTime } from '@/lib/format'
+import DocumentPreview from '../proforma/DocumentPreview'
 import {
   getExportCountryCurrency,
   normalizeExportCountry,
@@ -258,11 +261,8 @@ function money(value: number, currency: string) {
   return `${normalized}${separator}${numberFormatter.format(value)}`
 }
 
-function formatSavedDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
+const DECLARATION_STATUS_LABELS: Record<string, string> = { DRAFT: '임시저장' }
+const declarationStatusLabel = (status: string) => DECLARATION_STATUS_LABELS[status] || status
 
 function weight(value: number) {
   return numberFormatter.format(value)
@@ -515,23 +515,22 @@ function makePrintHtml(form: ExportDocumentForm, items: ExportLineItem[], mode: 
 function Field({
   label,
   later,
+  required,
   children,
 }: {
   label: string
   later?: boolean
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
     <label className="block">
-      <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-600">
+      <span className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-slate-700">
         <span>{label}</span>
-        {later ? (
-          <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[11px] font-bold text-sky-700">
-            EMS 후 입력 가능
-          </span>
-        ) : null}
+        {required ? <span className="text-[11px] font-bold text-slate-400">필수</span> : null}
+        {later ? <Badge>EMS 후</Badge> : null}
       </span>
-      <div className="mt-1">{children}</div>
+      <div className="mt-1.5">{children}</div>
     </label>
   )
 }
@@ -541,21 +540,41 @@ function isMissingRequired(value: string | number | null | undefined) {
   return String(value ?? '').trim().length === 0
 }
 
+// `missing` is only passed once the field was left or a save was attempted, so a fresh form isn't all red.
+// Fields filled in after EMS stay neutral with a dashed border instead of a tint that reads as focus.
 function inputToneClass({ later = false, missing = false }: { later?: boolean; missing?: boolean } = {}) {
   if (missing) return 'border-red-400 bg-red-50 text-red-950 focus:border-red-500 focus:ring-red-500/20'
-  if (later) return 'border-sky-300 bg-sky-50 text-sky-950 focus:border-sky-500 focus:ring-sky-500/20'
-  return 'border-slate-200 bg-white text-slate-900 focus:border-brand-orange focus:ring-brand-orange/15'
+  if (later) return 'border-dashed border-slate-300'
+  return ''
 }
 
 function textInputClass(options?: { later?: boolean; missing?: boolean }) {
-  return `h-10 w-full rounded-xl border px-3 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
+  return fieldClass(inputToneClass(options))
 }
 
 function textAreaClass(options?: { later?: boolean; missing?: boolean }) {
-  return `min-h-20 w-full resize-y rounded-xl border px-3 py-2 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
+  return fieldClass(`h-auto min-h-20 resize-y py-2 ${inputToneClass(options)}`)
 }
 
-function DocumentPreview({
+function ItemField({ label, hint, required, className = '', children }: { label: string; hint?: string; required?: boolean; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-slate-600">
+        {label}
+        {hint ? <span className="font-medium text-slate-400">{hint}</span> : null}
+        {required ? <span className="font-medium text-slate-400">· 필수</span> : null}
+      </span>
+      {children}
+    </label>
+  )
+}
+
+function itemInputClass({ missing = false, numeric = false }: { missing?: boolean; numeric?: boolean } = {}) {
+  return fieldClass(`h-9 px-2 text-[12px] ${numeric ? 'text-right tabular-nums' : ''} ${inputToneClass({ missing })}`)
+}
+
+/** Fixed A4 frame (794 × 1123) so FitToWidth can scale it like the PI and 위임장 previews. */
+function ExportSheetFrame({
   form,
   items,
   mode,
@@ -572,8 +591,9 @@ function DocumentPreview({
         <style>
           ${makePrintStyles()}
           @media screen {
-            body { background: #f1f5f9; padding: 12px; }
-            .sheet { background: #fff; box-shadow: 0 12px 30px rgba(15, 23, 42, .12); page-break-after: auto; }
+            body { background: #fff; padding: 10mm 0; }
+            .sheet { page-break-after: auto; }
+            .sheet + .sheet { margin-top: 10mm; padding-top: 10mm; border-top: 1px dashed #cbd5e1; }
           }
         </style>
       </head>
@@ -582,8 +602,9 @@ function DocumentPreview({
 
   return (
     <iframe
-      title={`${mode} preview`}
-      className="h-[760px] w-full rounded-xl border border-slate-200 bg-slate-100"
+      title={`${mode === 'commercial' ? 'Commercial Invoice' : 'Packing List'} 미리보기`}
+      className="block border-0 bg-white"
+      style={{ width: 794, height: 1123 }}
       srcDoc={previewHtml}
     />
   )
@@ -1177,6 +1198,15 @@ export default function ExportDeclarationClient({
   const [exchangeRates, setExchangeRates] = useState<ExportExchangeRates | null>(null)
   const [exchangeRateStatus, setExchangeRateStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [countryMenuOpen, setCountryMenuOpen] = useState(false)
+  // Required-field errors show per field after it is left, and everywhere after a save attempt.
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(() => new Set())
+  const [showAllMissing, setShowAllMissing] = useState(false)
+  const touch = (key: string) => setTouchedFields((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
+  const flagMissing = (key: string, value: string | number) => (showAllMissing || touchedFields.has(key)) && isMissingRequired(value)
+  const resetValidation = () => {
+    setTouchedFields(new Set())
+    setShowAllMissing(false)
+  }
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
   const selectedExportCountry = normalizeExportCountry(form.exportCountry)
@@ -1297,6 +1327,7 @@ export default function ExportDeclarationClient({
   const addItem = () => setItems((prev) => [...prev, createEmptyItem()])
   const removeItem = (id: string) => setItems((prev) => (prev.length > 1 ? prev.filter((item) => item.id !== id) : prev))
   const resetForm = () => {
+    resetValidation()
     setForm(defaultForm())
     setItems([createEmptyItem()])
     setPreviewMode('commercial')
@@ -1310,6 +1341,12 @@ export default function ExportDeclarationClient({
   )
 
   const previewItems = printableItems.length ? printableItems : items
+
+  const requiredFormKeys = ['invoiceNo', 'date', 'incoterms', 'currency', 'portOfLoading', 'exporter', 'consignee'] as const
+  const requiredItemKeys = ['productName', 'productNameEN', 'model', 'hsCode', 'quantity', 'unitPrice'] as const
+  const missingRequiredCount =
+    requiredFormKeys.filter((key) => isMissingRequired(form[key])).length +
+    items.reduce((sum, item) => sum + requiredItemKeys.filter((key) => isMissingRequired(item[key])).length, 0)
 
   const buildNewDraftForm = () => {
     const draft = defaultForm()
@@ -1354,6 +1391,7 @@ export default function ExportDeclarationClient({
         throw new Error(data?.error || '신청서 생성에 실패했습니다.')
       }
 
+      resetValidation()
       applyDeclaration(data as ExportDeclarationDetail)
       alert('새 신청서를 생성했습니다. 이제 내용을 입력한 뒤 작성내용 저장을 누르세요.')
     } catch (error) {
@@ -1372,6 +1410,7 @@ export default function ExportDeclarationClient({
         throw new Error(data?.error || '신청서를 불러오지 못했습니다.')
       }
 
+      resetValidation()
       applyDeclaration(data as ExportDeclarationDetail)
     } catch (error) {
       alert(error instanceof Error ? error.message : '신청서를 불러오지 못했습니다.')
@@ -1381,6 +1420,7 @@ export default function ExportDeclarationClient({
   }
 
   const saveDraftDeclaration = async () => {
+    setShowAllMissing(true)
     setIsUpdatingDeclaration(true)
     try {
       const response = await fetch('/api/admin/export-declaration', {
@@ -1471,17 +1511,17 @@ export default function ExportDeclarationClient({
         title="수출신고"
         description="내부 문서 작성 도구입니다. 문서 생성 후 UNI-PASS에서 수출신고를 별도로 제출하세요."
         actions={
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-            <Button variant="ghost" onClick={resetForm}>
+          <>
+            <Button variant="secondary" onClick={resetForm}>
               초기화
             </Button>
             <Button variant="secondary" icon={<Save size={15} />} onClick={saveDraftDeclaration} loading={isUpdatingDeclaration}>
               {isUpdatingDeclaration ? '저장 중' : '임시저장'}
             </Button>
-            <Button variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating} className="order-first col-span-2 sm:order-none">
+            <Button data-primary variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating}>
               {isCreating ? '생성 중' : '내부 문서 생성'}
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -1516,18 +1556,18 @@ export default function ExportDeclarationClient({
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-[13px] font-black text-slate-950">{row.invoiceNo}</span>
-                    <Badge>{row.status}</Badge>
+                    <Badge>{declarationStatusLabel(row.status)}</Badge>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] font-bold text-slate-500">
-                    <span className="tabular-nums">{formatSavedDate(row.createdAt)}</span>
+                    <span className="tabular-nums">{formatDateTime(row.createdAt)}</span>
                     <span className="tabular-nums text-slate-900">{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
                   </div>
                 </button>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-2 h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  icon={deletingDeclarationId === row.id ? undefined : <Trash2 size={15} />}
+                  variant="dangerGhost"
+                  size="icon"
+                  className="absolute right-2 top-2"
+                  icon={deletingDeclarationId === row.id ? undefined : <Trash2 size={16} />}
                   onClick={() => deleteDeclaration(row.id)}
                   loading={deletingDeclarationId === row.id}
                   aria-label={`${row.invoiceNo} 삭제`}
@@ -1547,7 +1587,7 @@ export default function ExportDeclarationClient({
       </section>
 
       <div className="space-y-5">
-        <div className={activeWorkTab === 'documents' && selectedDeclarationId ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.74fr)] xl:items-start' : 'hidden'}>
+        <div className={activeWorkTab === 'documents' && selectedDeclarationId ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,600px)] xl:items-start' : 'hidden'}>
           <div className="flex min-w-0 flex-col gap-5">
           <section className="order-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -1555,60 +1595,65 @@ export default function ExportDeclarationClient({
                 <FileSpreadsheet size={17} className="text-slate-500" />
                 <h2 className="text-[13px] font-bold text-slate-900">PI / Packing List 작성</h2>
               </div>
-              <Badge tone={selectedDeclarationId ? 'neutral' : 'warning'}>
-                {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={missingRequiredCount ? 'warning' : 'success'}>
+                  {missingRequiredCount ? `필수 ${missingRequiredCount}칸 남음` : '필수 입력 완료'}
+                </Badge>
+                <Badge tone={selectedDeclarationId ? 'neutral' : 'warning'}>
+                  {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
+                </Badge>
+              </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Invoice No. / 송장번호">
-                <input className={textInputClass({ missing: isMissingRequired(form.invoiceNo) })} value={form.invoiceNo} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
+              <Field label="송장번호 (Invoice No.)" required>
+                <input className={textInputClass({ missing: flagMissing('invoiceNo', form.invoiceNo) })} value={form.invoiceNo} onBlur={() => touch('invoiceNo')} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
               </Field>
-              <Field label="Date / 작성일">
-                <input type="date" className={textInputClass({ missing: isMissingRequired(form.date) })} value={form.date} onChange={(event) => setFormValue('date', event.target.value)} />
+              <Field label="작성일 (Date)" required>
+                <input type="date" className={textInputClass({ missing: flagMissing('date', form.date) })} value={form.date} onBlur={() => touch('date')} onChange={(event) => setFormValue('date', event.target.value)} />
               </Field>
-              <Field label="Departure Date / 출항일" later>
-                <input type="date" className={textInputClass({ later: true })} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
+              <Field label="출항일 (Departure Date)" later>
+                <input type="date" className={textInputClass({ later: true }) + (form.departureDate ? '' : ' text-slate-400')} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
               </Field>
-              <Field label="Vessel / Flight / 선박·항공편" later>
+              <Field label="선박·항공편 (Vessel / Flight)" later>
                 <input className={textInputClass({ later: true })} value={form.vesselFlight} onChange={(event) => setFormValue('vesselFlight', event.target.value)} />
               </Field>
-              <Field label="Incoterms / 거래조건">
-                <input className={textInputClass({ missing: isMissingRequired(form.incoterms) })} value={form.incoterms} onChange={(event) => setFormValue('incoterms', event.target.value)} />
+              <Field label="거래조건 (Incoterms)" required>
+                <input className={textInputClass({ missing: flagMissing('incoterms', form.incoterms) })} value={form.incoterms} onBlur={() => touch('incoterms')} onChange={(event) => setFormValue('incoterms', event.target.value)} />
               </Field>
-              <Field label="Currency / 통화">
-                <input className={textInputClass({ missing: isMissingRequired(form.currency) })} value={form.currency} onChange={(event) => setFormValue('currency', event.target.value.toUpperCase())} />
+              <Field label="통화 (Currency)" required>
+                <input className={textInputClass({ missing: flagMissing('currency', form.currency) })} value={form.currency} onBlur={() => touch('currency')} onChange={(event) => setFormValue('currency', event.target.value.toUpperCase())} />
               </Field>
-              <Field label="Port of Loading / 선적항">
-                <input className={textInputClass({ missing: isMissingRequired(form.portOfLoading) })} value={form.portOfLoading} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
+              <Field label="선적항 (Port of Loading)" required>
+                <input className={textInputClass({ missing: flagMissing('portOfLoading', form.portOfLoading) })} value={form.portOfLoading} onBlur={() => touch('portOfLoading')} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
               </Field>
-              <Field label="Port of Discharge / 도착항" later>
+              <Field label="도착항 (Port of Discharge)" later>
                 <input className={textInputClass({ later: true })} value={form.portOfDischarge} onChange={(event) => setFormValue('portOfDischarge', event.target.value)} />
               </Field>
-              <Field label="Exporter / 수출자">
-                <textarea className={textAreaClass({ missing: isMissingRequired(form.exporter) })} value={form.exporter} onChange={(event) => setFormValue('exporter', event.target.value)} />
+              <Field label="수출자 (Exporter)" required>
+                <textarea className={textAreaClass({ missing: flagMissing('exporter', form.exporter) })} value={form.exporter} onBlur={() => touch('exporter')} onChange={(event) => setFormValue('exporter', event.target.value)} />
               </Field>
-              <Field label="Consignee / 수입자">
-                <textarea className={textAreaClass({ missing: isMissingRequired(form.consignee) })} value={form.consignee} onChange={(event) => setFormValue('consignee', event.target.value)} placeholder="수입자 회사명, 주소, 연락처" />
+              <Field label="수입자 (Consignee)" required>
+                <textarea className={textAreaClass({ missing: flagMissing('consignee', form.consignee) })} value={form.consignee} onBlur={() => touch('consignee')} onChange={(event) => setFormValue('consignee', event.target.value)} placeholder="수입자 회사명, 주소, 연락처" />
               </Field>
-              <Field label="Buyer / 구매자">
+              <Field label="구매자 (Buyer)">
                 <textarea className={textAreaClass()} value={form.buyer} onChange={(event) => setFormValue('buyer', event.target.value)} />
               </Field>
-              <Field label="L/C No. and Date / 신용장번호·일자" later>
+              <Field label="신용장번호·일자 (L/C No. and Date)" later>
                 <textarea className={textAreaClass({ later: true })} value={form.lcNoDate} onChange={(event) => setFormValue('lcNoDate', event.target.value)} />
               </Field>
-              <Field label="Other References / 참고사항">
+              <Field label="참고사항 (Other References)">
                 <textarea className={textAreaClass()} value={form.otherReferences} onChange={(event) => setFormValue('otherReferences', event.target.value)} />
               </Field>
-              <Field label="Terms of Delivery and Payment / 인도·결제조건">
+              <Field label="인도·결제조건 (Terms of Delivery and Payment)">
                 <textarea className={textAreaClass()} value={form.termsDeliveryPayment} onChange={(event) => setFormValue('termsDeliveryPayment', event.target.value)} />
               </Field>
-              <Field label="Shipping Marks / 화인">
+              <Field label="화인 (Shipping Marks)">
                 <textarea className={textAreaClass()} value={form.shippingMarks} onChange={(event) => setFormValue('shippingMarks', event.target.value)} />
               </Field>
-              <Field label="No. and Kind of Packages / 포장수량·종류">
+              <Field label="포장수량·종류 (No. and Kind of Packages)">
                 <textarea className={textAreaClass()} value={form.packagesKind} onChange={(event) => setFormValue('packagesKind', event.target.value)} placeholder="예: 10 CT" />
               </Field>
-              <Field label="Remarks / 비고">
+              <Field label="비고 (Remarks)">
                 <textarea className={textAreaClass()} value={form.remarks} onChange={(event) => setFormValue('remarks', event.target.value)} />
               </Field>
             </div>
@@ -1627,7 +1672,7 @@ export default function ExportDeclarationClient({
                     onClick={() => setCountryMenuOpen((open) => !open)}
                     aria-haspopup="menu"
                     aria-expanded={countryMenuOpen}
-                    className="flex h-8 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    className={buttonClass('secondary', 'sm', 'gap-2 px-2.5')}
                   >
                     <span className="text-[11px] text-slate-500">수출국</span>
                     <ExportCountryFlag country={selectedExportCountry} />
@@ -1652,100 +1697,115 @@ export default function ExportDeclarationClient({
                     </div>
                   ) : null}
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
-                  exchangeRateStatus === 'ready' ? 'bg-emerald-50 text-emerald-700' : exchangeRateStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
-                }`}>
+                <Badge tone={exchangeRateStatus === 'ready' ? 'success' : exchangeRateStatus === 'error' ? 'danger' : 'neutral'} className="h-auto min-h-5 whitespace-normal py-1">
                   {exchangeRateStatus === 'ready' && exchangeRates
                     ? `${selectedCountryOption.priceLabel}(${getExportCountryCurrency(selectedExportCountry)}) → US$ · 1USD ₩${intFormatter.format(exchangeRates.KRW)} / ¥${numberFormatter.format(exchangeRates.JPY)}`
                     : exchangeRateStatus === 'error'
                       ? '환율 조회 실패'
                       : '환율 조회 중'}
-                </span>
+                </Badge>
                 <Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addItem}>
                   행 추가
                 </Button>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[1380px] table-fixed text-[12px]">
-                <thead className="ux-thead">
-                  <tr>
-                    <th className="w-[160px] px-2 py-2 text-left whitespace-nowrap">관리상품</th>
-                    <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">상품명</th>
-                    <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">영문명</th>
-                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">모델 <span className="text-[11px] font-medium text-slate-400">Model</span></th>
-                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">세번부호 <span className="text-[11px] font-medium text-slate-400">HS Code</span></th>
-                    <th className="w-[90px] px-2 py-2 text-left whitespace-nowrap">원산지</th>
-                    <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">수량</th>
-                    <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">단가</th>
-                    <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">금액</th>
-                    <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">박스수</th>
-                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">순중량 <span className="text-[11px] font-medium text-slate-400">KG</span></th>
-                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">총중량 <span className="text-[11px] font-medium text-slate-400">KG</span></th>
-                    <th className="w-[85px] px-2 py-2 text-right whitespace-nowrap">부피 <span className="text-[11px] font-medium text-slate-400">CBM</span></th>
-                    <th className="w-[130px] px-2 py-2 text-left whitespace-nowrap">규격 <span className="text-[11px] font-medium text-slate-400">cm</span></th>
-                    <th className="w-[54px] px-2 py-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((item) => (
-                    <tr key={item.id} className="align-top">
-                      <td className="px-2 py-2">
-                        <select className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] font-bold outline-none" value={item.productId} onChange={(event) => applyProduct(item.id, event.target.value)}>
+            {/* One item = two rows (identity, then quantities/weights) so every required column stays on screen at any width. */}
+            <ol className="@container space-y-2">
+              {items.map((item, index) => {
+                const key = (name: string) => `${item.id}.${name}`
+                return (
+                  <li key={item.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-extrabold text-slate-700">품목 {index + 1}</span>
+                      <button type="button" onClick={() => removeItem(item.id)} disabled={items.length <= 1} className={buttonClass('dangerGhost', 'icon', '-my-1 -mr-1')} title="행 삭제" aria-label={`품목 ${index + 1} 삭제`}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @3xl:grid-cols-[1.2fr_1.5fr_1.5fr_1fr_1fr_0.7fr]">
+                      <ItemField label="관리상품" className="col-span-2 @md:col-span-1">
+                        <select className={selectClass(!!item.productId, 'h-9 px-2 text-[12px]')} value={item.productId} onChange={(event) => applyProduct(item.id, event.target.value)}>
                           <option value="">직접입력</option>
                           {products.map((product) => (
                             <option key={product.id} value={product.id}>{product.nameJP || product.name}</option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.productName) })} value={item.productName} onChange={(event) => updateItem(item.id, { productName: event.target.value })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.productNameEN) })} value={item.productNameEN} onChange={(event) => updateItem(item.id, { productNameEN: event.target.value })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.model) })} value={item.model} onChange={(event) => updateItem(item.id, { model: event.target.value.toUpperCase() })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.hsCode) })} value={item.hsCode} onChange={(event) => updateItem(item.id, { hsCode: event.target.value })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.origin} onChange={(event) => updateItem(item.id, { origin: event.target.value.toUpperCase() })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass({ missing: isMissingRequired(item.quantity) })} text-right`} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass({ missing: isMissingRequired(item.unitPrice) })} text-right`} value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: parseNumberInput(event.target.value) })} /></td>
-                      <td className="px-2 py-2 text-right font-black text-slate-950">{money(lineAmount(item), form.currency)}</td>
-                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.cartons} onChange={(event) => updateCartons(item.id, event.target.value)} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.netWeight} onChange={(event) => updateItem(item.id, { netWeight: parseNumberInput(event.target.value) })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.grossWeight} onChange={(event) => updateItem(item.id, { grossWeight: parseNumberInput(event.target.value) })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} step="0.001" className={`${textInputClass()} text-right`} value={item.cbm} onChange={(event) => updateItem(item.id, { cbm: parseNumberInput(event.target.value) })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.dimension} onChange={(event) => updateDimension(item.id, event.target.value)} placeholder="50x40x30cm" /></td>
-                      <td className="px-2 py-2 text-center">
-                        <button type="button" onClick={() => removeItem(item.id)} className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600')} title="행 삭제" aria-label="행 삭제">
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </ItemField>
+                      <ItemField label="상품명" required className="col-span-2 @md:col-span-1">
+                        <input className={itemInputClass({ missing: flagMissing(key('productName'), item.productName) })} value={item.productName} onBlur={() => touch(key('productName'))} onChange={(event) => updateItem(item.id, { productName: event.target.value })} />
+                      </ItemField>
+                      <ItemField label="영문명" required className="col-span-2 @md:col-span-1">
+                        <input className={itemInputClass({ missing: flagMissing(key('productNameEN'), item.productNameEN) })} value={item.productNameEN} onBlur={() => touch(key('productNameEN'))} onChange={(event) => updateItem(item.id, { productNameEN: event.target.value })} />
+                      </ItemField>
+                      <ItemField label="모델" hint="Model" required>
+                        <input className={itemInputClass({ missing: flagMissing(key('model'), item.model) })} value={item.model} onBlur={() => touch(key('model'))} onChange={(event) => updateItem(item.id, { model: event.target.value.toUpperCase() })} />
+                      </ItemField>
+                      <ItemField label="세번부호" hint="HS Code" required>
+                        <input className={itemInputClass({ missing: flagMissing(key('hsCode'), item.hsCode) })} value={item.hsCode} onBlur={() => touch(key('hsCode'))} onChange={(event) => updateItem(item.id, { hsCode: event.target.value })} />
+                      </ItemField>
+                      <ItemField label="원산지">
+                        <input className={itemInputClass()} value={item.origin} onChange={(event) => updateItem(item.id, { origin: event.target.value.toUpperCase() })} />
+                      </ItemField>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 @md:grid-cols-4 @3xl:grid-cols-8">
+                      <ItemField label="수량" required>
+                        <input type="number" min={0} className={itemInputClass({ missing: flagMissing(key('quantity'), item.quantity), numeric: true })} value={item.quantity} onBlur={() => touch(key('quantity'))} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} />
+                      </ItemField>
+                      <ItemField label="단가" required>
+                        <input type="number" min={0} step="0.01" className={itemInputClass({ missing: flagMissing(key('unitPrice'), item.unitPrice), numeric: true })} value={item.unitPrice} onBlur={() => touch(key('unitPrice'))} onChange={(event) => updateItem(item.id, { unitPrice: parseNumberInput(event.target.value) })} />
+                      </ItemField>
+                      <ItemField label="금액">
+                        <p className="flex h-9 items-center justify-end text-[13px] font-black tabular-nums text-slate-950">{money(lineAmount(item), form.currency)}</p>
+                      </ItemField>
+                      <ItemField label="박스수">
+                        <input type="number" min={0} className={itemInputClass({ numeric: true })} value={item.cartons} onChange={(event) => updateCartons(item.id, event.target.value)} />
+                      </ItemField>
+                      <ItemField label="순중량" hint="KG">
+                        <input type="number" min={0} step="0.01" className={itemInputClass({ numeric: true })} value={item.netWeight} onChange={(event) => updateItem(item.id, { netWeight: parseNumberInput(event.target.value) })} />
+                      </ItemField>
+                      <ItemField label="총중량" hint="KG">
+                        <input type="number" min={0} step="0.01" className={itemInputClass({ numeric: true })} value={item.grossWeight} onChange={(event) => updateItem(item.id, { grossWeight: parseNumberInput(event.target.value) })} />
+                      </ItemField>
+                      <ItemField label="부피" hint="CBM">
+                        <input type="number" min={0} step="0.001" className={itemInputClass({ numeric: true })} value={item.cbm} onChange={(event) => updateItem(item.id, { cbm: parseNumberInput(event.target.value) })} />
+                      </ItemField>
+                      <ItemField label="규격" hint="cm">
+                        <input className={itemInputClass()} value={item.dimension} onChange={(event) => updateDimension(item.id, event.target.value)} placeholder="예: 50x40x30cm" />
+                      </ItemField>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
           </section>
           </div>
 
-          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-[76px] xl:max-h-[calc(100vh-92px)] xl:overflow-auto">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <Tabs
-                aria-label="미리보기 문서"
-                items={[
-                  { key: 'commercial', label: 'Commercial Invoice' },
-                  { key: 'packing', label: 'Packing List' },
-                ]}
-                value={previewMode}
-                onChange={setPreviewMode}
-              />
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button variant="secondary" size="sm" icon={<Printer size={14} />} onClick={() => printDocuments(previewMode)}>
-                  {previewMode === 'commercial' ? 'Invoice 인쇄' : 'Packing List 인쇄'}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => printDocuments('both')}>
-                  두 문서 연속 인쇄
-                </Button>
-              </div>
-            </div>
-            <DocumentPreview form={form} items={previewItems} mode={previewMode} />
-          </section>
+          <div className="min-w-0 space-y-3 xl:sticky xl:top-[76px]">
+            <Tabs
+              aria-label="미리보기 문서"
+              items={[
+                { key: 'commercial', label: 'Commercial Invoice' },
+                { key: 'packing', label: 'Packing List' },
+              ]}
+              value={previewMode}
+              onChange={setPreviewMode}
+            />
+            <DocumentPreview
+              title={previewMode === 'commercial' ? 'Commercial Invoice 미리보기' : 'Packing List 미리보기'}
+              meta={form.invoiceNo}
+              actions={
+                <>
+                  <Button variant="secondary" size="sm" icon={<Printer size={14} />} onClick={() => printDocuments(previewMode)}>
+                    {previewMode === 'commercial' ? 'Invoice 인쇄' : 'Packing List 인쇄'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => printDocuments('both')}>
+                    두 문서 연속 인쇄
+                  </Button>
+                </>
+              }
+            >
+              <ExportSheetFrame form={form} items={previewItems} mode={previewMode} />
+            </DocumentPreview>
+          </div>
         </div>
 
         <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 max-w-[1360px] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>

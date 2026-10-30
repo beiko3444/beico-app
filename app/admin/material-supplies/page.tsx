@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { sortMaterialSupplies } from '@/lib/materialSupplies'
 import MaterialSuppliesClient, { type MaterialSupplyItem } from './MaterialSuppliesClient'
 
+export const metadata = { title: '부자재 주문' }
+
 export const dynamic = 'force-dynamic'
 
 type MaterialSupplyReader = {

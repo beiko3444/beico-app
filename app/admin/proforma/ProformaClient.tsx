@@ -1,13 +1,15 @@
 'use client'
 
-import { ImageIcon, Trash2 } from 'lucide-react'
+import { ImageIcon, Printer, Trash2 } from 'lucide-react'
 
 import { useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
-import FitToWidth from '@/components/ui/FitToWidth'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
+import { formatDate } from '@/lib/format'
+import DocumentPreview from './DocumentPreview'
 
 export type PartnerOption = {
     id: string
@@ -71,12 +73,6 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-})
-
-const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
 })
 
 const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
@@ -668,7 +664,7 @@ ${rowsHtml}
     }
 
     const quantityInputClass = (checked: boolean) =>
-        `h-9 w-20 rounded-lg border px-2 text-right font-bold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        `h-9 w-20 rounded-lg border px-2 text-right text-[13px] tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
             checked
                 ? 'border-slate-300 bg-white text-slate-900 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-white'
                 : 'border-transparent bg-slate-50 text-slate-400 dark:bg-[#1a1a1a]'
@@ -680,25 +676,19 @@ ${rowsHtml}
                 title="PI 발급"
                 description="작성 후 발행하면 발급리스트에 저장됩니다. 출력만으로는 발행 기록이 생성되지 않습니다."
                 actions={
-                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-                        {leftTab === 'write' ? (
-                            <Button variant="ghost" onClick={resetDraft}>
-                                초기화
-                            </Button>
-                        ) : null}
-                        <Button variant="secondary" onClick={handlePrint} className={leftTab === 'write' ? '' : 'col-span-2'}>
-                            출력 (PDF)
+                    // Both stay in place on the 발급리스트 tab (disabled) so the header doesn't shift; 출력 lives on the preview.
+                    <>
+                        <Button variant="secondary" onClick={resetDraft} disabled={leftTab !== 'write'}>
+                            초기화
                         </Button>
-                        {leftTab === 'write' ? (
-                            <Button variant="primary" onClick={handleIssue} loading={isIssuing} className="order-first col-span-2 sm:order-none">
-                                {isIssuing ? '발행 중...' : '발행하기'}
-                            </Button>
-                        ) : null}
-                    </div>
+                        <Button data-primary variant="primary" onClick={handleIssue} loading={isIssuing} disabled={leftTab !== 'write'}>
+                            {isIssuing ? '발행 중...' : '발행하기'}
+                        </Button>
+                    </>
                 }
             />
 
-            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,560px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
+            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,600px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
                 <div className="pi-no-print min-w-0 space-y-6">
                     <section className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5">
                         <Tabs
@@ -713,9 +703,9 @@ ${rowsHtml}
 
                         {leftTab === 'write' ? (
                             <div className="space-y-4">
-                                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                                     <label className="block min-w-0">
-                                        <span className="text-[11px] font-bold text-slate-600 dark:text-gray-400">업체 선택</span>
+                                        <span className={labelClass}>발행 기록용 업체</span>
                                         <select
                                             value={selectedPartnerId}
                                             onChange={(event) => {
@@ -723,7 +713,7 @@ ${rowsHtml}
                                                 setActiveIssuedId(null)
                                                 setLeftTab('write')
                                             }}
-                                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white"
+                                            className={selectClass(!!selectedPartnerId)}
                                         >
                                             <option value="">업체를 선택하세요</option>
                                             {partners.map((partner) => (
@@ -734,22 +724,24 @@ ${rowsHtml}
                                         </select>
                                     </label>
                                     <label className="block min-w-0">
-                                        <span className="text-[11px] font-bold text-slate-600 dark:text-gray-400">생산 소요기간</span>
+                                        <span className={labelClass}>생산 소요기간</span>
                                         <input
                                             type="text"
                                             value={draftProductionTime}
                                             onChange={(event) => setDraftProductionTime(event.target.value)}
-                                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white"
-                                            placeholder="e.g. 3-5 days after receiving the deposit"
+                                            className={fieldClass()}
+                                            placeholder="예: 3-5 days after receiving the deposit"
                                         />
                                     </label>
-                                    <p className="text-[11px] text-slate-500 dark:text-gray-400 sm:col-span-2">상품관리의 미국 거래 단가(USD)가 적용됩니다. 단가 미설정 상품은 선택할 수 없습니다.</p>
+                                    <p className="text-[11px] text-slate-500 dark:text-gray-400 sm:col-span-2">
+                                        수입자(Consignee)는 PI에 고정으로 인쇄되고, 업체는 발급리스트 기록과 하단 문구에 쓰입니다. 상품관리의 미국 거래 단가(USD)가 적용되며, 단가 미설정 상품은 선택할 수 없습니다.
+                                    </p>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-[#2a2a2a]">
                                     <label className="min-w-0 flex-1">
                                         <span className="sr-only">PI 상품 검색</span>
-                                        <input type="search" className="ux-input" value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="상품명·코드 검색" />
+                                        <input type="search" className={fieldClass()} value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="상품명·코드 검색" />
                                     </label>
                                     <label className="flex min-h-11 items-center gap-2 text-sm font-bold text-slate-700 dark:text-gray-300">
                                         <input type="checkbox" checked={selectedOnly} onChange={event => setSelectedOnly(event.target.checked)} className="h-5 w-5 accent-brand-orange" />
@@ -784,8 +776,13 @@ ${rowsHtml}
                                                         </span>
                                                     </span>
                                                 </label>
-                                                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 pl-8 text-sm">
-                                                    <span className="tabular-nums text-slate-600 dark:text-gray-300">{hasPrice ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}</span>
+                                                {/* 단가 × 수량 = 금액, with small labels so the three numbers don't have to be guessed by position. */}
+                                                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] items-end gap-2 pl-8 text-sm">
+                                                    <span className="min-w-0">
+                                                        <span className="block text-[11px] text-slate-400">단가</span>
+                                                        <span className={`block tabular-nums ${hasPrice ? 'text-slate-700 dark:text-gray-300' : 'text-xs text-slate-400'}`}>{hasPrice ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}</span>
+                                                    </span>
+                                                    <span aria-hidden="true" className="pb-2 text-slate-300">×</span>
                                                     <input
                                                         type="number"
                                                         min={1}
@@ -796,7 +793,11 @@ ${rowsHtml}
                                                         onFocus={(event) => event.currentTarget.select()}
                                                         className={quantityInputClass(rowState.checked)}
                                                     />
-                                                    <span className="text-right font-black tabular-nums text-slate-900 dark:text-white">{rowState.checked ? usdFormatter.format(amount) : '-'}</span>
+                                                    <span aria-hidden="true" className="pb-2 text-slate-300">=</span>
+                                                    <span className="min-w-0 text-right">
+                                                        <span className="block text-[11px] text-slate-400">금액</span>
+                                                        <span className={`block tabular-nums ${rowState.checked ? 'font-black text-slate-900 dark:text-white' : 'text-slate-300'}`}>{rowState.checked ? usdFormatter.format(amount) : '-'}</span>
+                                                    </span>
                                                 </div>
                                             </li>
                                         )
@@ -867,7 +868,7 @@ ${rowsHtml}
                                                                 className={quantityInputClass(rowState.checked)}
                                                             />
                                                         </td>
-                                                        <td className="whitespace-nowrap px-3 py-2 text-right font-black tabular-nums text-slate-900 dark:text-white">
+                                                        <td className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${rowState.checked ? 'font-black text-slate-900 dark:text-white' : 'text-slate-300'}`}>
                                                             {rowState.checked ? usdFormatter.format(amount) : '-'}
                                                         </td>
                                                     </tr>
@@ -905,14 +906,13 @@ ${rowsHtml}
                                                         className={`cursor-pointer ${activeIssuedId === invoice.id ? 'bg-brand-orange-soft dark:bg-[#2a1d19]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'}`}
                                                         onClick={() => setActiveIssuedId(invoice.id)}
                                                     >
-                                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-gray-400">{dateFormatter.format(new Date(invoice.issueDate))}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-gray-400">{formatDate(invoice.issueDate)}</td>
                                                         <td className="px-3 py-2 font-bold text-slate-900 dark:text-white">{invoice.partnerName}</td>
                                                         <td className="whitespace-nowrap px-3 py-2 text-right font-black tabular-nums text-slate-900 dark:text-white">{usdFormatter.format(invoice.totalUsd)}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                                variant="dangerGhost"
+                                                                size="icon"
                                                                 aria-label={`${invoice.invoiceNumber} 삭제`}
                                                                 title="삭제"
                                                                 onClick={(event) => {
@@ -920,7 +920,7 @@ ${rowsHtml}
                                                                     void handleDeleteIssued(invoice.id)
                                                                 }}
                                                                 loading={deletingInvoiceId === invoice.id}
-                                                                icon={deletingInvoiceId === invoice.id ? undefined : <Trash2 size={15} />}
+                                                                icon={deletingInvoiceId === invoice.id ? undefined : <Trash2 size={16} />}
                                                             />
                                                         </td>
                                                     </tr>
@@ -934,10 +934,14 @@ ${rowsHtml}
                     </section>
                 </div>
 
-                <section className="min-w-0 xl:sticky xl:top-[76px]" aria-label="인쇄 미리보기">
-                    <p className="pi-no-print mb-2 text-xs font-bold text-slate-500 dark:text-gray-400">인쇄 미리보기</p>
-                    <FitToWidth width={794} className="bg-white shadow-lg ring-1 ring-slate-200 dark:ring-[#2a2a2a]">
-                    <div id="pi-print-sheet" className="pi-inner-content min-h-[297mm] bg-white pb-[18mm] pl-[12mm] pr-[15mm] pt-[10mm] text-[#22253f]">
+                <DocumentPreview
+                    title="인쇄 미리보기"
+                    meta={activeIssuedInvoice ? `${activeIssuedInvoice.invoiceNumber} · ${activeIssuedInvoice.partnerName}` : '작성 중인 PI'}
+                    actions={<Button variant="secondary" size="sm" icon={<Printer size={14} />} onClick={handlePrint}>출력 (PDF)</Button>}
+                    footnote="인쇄창에서 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다."
+                    className="xl:sticky xl:top-[76px]"
+                >
+                    <div className="pi-inner-content min-h-[297mm] bg-white pb-[18mm] pl-[12mm] pr-[15mm] pt-[10mm] text-[#22253f]">
                         <div className="h-1 w-full bg-brand-orange mb-2" />
                         <div className="border-b-2 border-brand-orange pb-2">
                             <div className="text-center">
@@ -1066,9 +1070,7 @@ ${rowsHtml}
                             </div>
                         </div>
                     </div>
-                    </FitToWidth>
-                    <p className="pi-no-print mt-2 text-[11px] text-slate-500 dark:text-gray-400">인쇄창에서 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.</p>
-                </section>
+                </DocumentPreview>
             </div>
         </div>
     )

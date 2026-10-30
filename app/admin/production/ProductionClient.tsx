@@ -8,6 +8,10 @@ import Modal from '@/components/Modal'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import StatCard from '@/components/ui/StatCard'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
+import { formatDate } from '@/lib/format'
 import { getProductionPrices, getProductionProducts, selectProductionProduct, productionMargin, PRODUCTION_CATEGORIES, type ProductionPriceProduct } from '@/lib/productionPricing'
 import {
     LineChart,
@@ -17,11 +21,9 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    AreaChart,
-    Area,
     LabelList
 } from 'recharts'
-import { Package, DollarSign, Calculator, Plus, Trash2, X } from 'lucide-react'
+import { Package, DollarSign, Calculator, Pencil, Plus, Trash2 } from 'lucide-react'
 
 type ProductionBatch = {
     id: string
@@ -62,18 +64,20 @@ const batchTotalCost = (b: ProductionBatch) =>
 const average = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null)
 
 const legendClass = 'mb-3 w-full border-b border-slate-100 pb-2 text-[13px] font-black text-slate-900'
-const fieldLabelClass = 'text-[11px] font-bold text-slate-600'
-const fieldInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-brand-orange'
-const readonlyFieldClass = 'flex h-10 w-full items-center rounded-xl bg-slate-50 px-3 text-sm font-bold text-slate-700'
+const fieldLabelClass = labelClass
+const fieldInputClass = fieldClass()
+const readonlyFieldClass = 'flex h-10 w-full items-center rounded-[10px] bg-slate-50 px-3 text-[13px] font-bold text-slate-700'
 
 function MarginBadge({ rate }: { rate: number | null }) {
     if (rate === null) return <span className="text-slate-400">-</span>
     return <Badge tone={rate < 0 ? 'danger' : rate >= 30 ? 'success' : 'neutral'} className="tabular-nums">{rate.toFixed(1)}%</Badge>
 }
 
-export default function ProductionClient() {
+export default function ProductionClient({ initialCounts = {} }: { initialCounts?: Record<string, number> }) {
     const [excludeReview, setExcludeReview] = useState(false)
     const [activeTab, setActiveTab] = useState(CATEGORIES[0]) // Default to 청갯지렁이
+    // Batches per category for the tab counts; the active tab's count is refreshed from every fetch.
+    const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(initialCounts)
 
     // Formatting Helpers
     const formatNumber = (val: string | number) => {
@@ -161,7 +165,10 @@ export default function ProductionClient() {
             if (!res.ok) throw new Error('생산 기록 조회 실패')
             const data = await res.json()
             if (!Array.isArray(data)) throw new Error('생산 기록 응답 오류')
-            if (requestId === batchRequestRef.current) setBatches(data)
+            if (requestId === batchRequestRef.current) {
+                setBatches(data)
+                setCategoryCounts(current => ({ ...current, [activeTab]: data.length }))
+            }
         } catch (error) {
             console.error(error)
             if (requestId === batchRequestRef.current) {
@@ -359,6 +366,11 @@ export default function ProductionClient() {
             })), [batches]
     )
 
+    const unitCostMissing = lineChartData.every(point => point.unit === null)
+    const formTotalCost = ['rawMaterialCost', 'electricityCost', 'packagingCost', 'warehouseCost', 'shippingCost', 'customsFee', 'customsDuty', 'vat']
+        .reduce((sum, key) => sum + (Number(parseNumber(formData[key as keyof typeof formData])) || 0), 0)
+    const formQuantity = Number(parseNumber(formData.quantity)) || 0
+
     const reviewBatches = batches.filter(batch => productionReviewReason(batch))
     const summaryBatches = excludeReview ? batches.filter(batch => !productionReviewReason(batch)) : batches
     const wholesaleMargins = summaryBatches.map(batch => productionMargin(batch.salesPrice, batch.unitCost)).filter((margin): margin is number => margin !== null)
@@ -405,7 +417,7 @@ export default function ProductionClient() {
                 title="생산 관리"
                 description="카테고리별 생산 기록과 원가·마진을 관리합니다."
                 actions={
-                    <Button variant="primary" icon={<Plus size={15} />} onClick={openNewRecord}>
+                    <Button data-primary variant="primary" icon={<Plus size={15} />} onClick={openNewRecord}>
                         생산 기록
                     </Button>
                 }
@@ -414,7 +426,7 @@ export default function ProductionClient() {
             <div className="space-y-2">
                 <Tabs
                     aria-label="생산 카테고리"
-                    items={CATEGORIES.map(cat => ({ key: cat, label: cat }))}
+                    items={CATEGORIES.map(cat => ({ key: cat, label: cat, count: categoryCounts[cat] ?? null }))}
                     value={activeTab}
                     onChange={category => {
                         ++batchRequestRef.current
@@ -444,39 +456,26 @@ export default function ProductionClient() {
             {showEmpty ? (
                 <EmptyState
                     title={`${activeTab} 생산 기록이 없습니다`}
-                    description="생산 기록을 등록하면 원가·수량 지표와 추이 차트가 여기에 표시됩니다."
-                    action={<Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={openNewRecord}>생산 기록</Button>}
+                    description="상단의 ‘생산 기록’으로 등록하면 원가·수량 지표와 추이 차트가 여기에 표시됩니다."
                 />
             ) : (
             <>
             {/* Statistics Dashboard */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 {[
-                    {
-                        label: '총 생산수량',
-                        value: summaryBatches.length > 0 ? summaryBatches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개' : '-'
-                    },
-                    {
-                        label: '차수 평균 수량',
-                        value: averageQuantity !== null ? Math.round(averageQuantity).toLocaleString() + '개' : '-'
-                    },
-                    {
-                        label: '차수 평균 비용',
-                        value: averageCost !== null ? Math.round(averageCost).toLocaleString() + '원' : '-'
-                    },
-                    {
-                        label: '차수 평균 단가',
-                        value: averageUnitCost !== null ? Math.round(averageUnitCost).toLocaleString() + '원' : '-'
-                    },
-                    {
-                        label: '차수 평균 도매 마진',
-                        value: averageMargin !== null ? averageMargin.toFixed(1) + '%' : '-'
-                    }
+                    { label: '총 생산수량', value: summaryBatches.length > 0 ? summaryBatches.reduce((acc, b) => acc + b.quantity, 0) : null, unit: '개' },
+                    { label: '차수 평균 수량', value: averageQuantity !== null ? Math.round(averageQuantity) : null, unit: '개' },
+                    { label: '차수 평균 비용', value: averageCost !== null ? Math.round(averageCost) : null, unit: '원' },
+                    { label: '차수 평균 단가', value: averageUnitCost !== null ? Math.round(averageUnitCost) : null, unit: '원' },
+                    { label: '차수 평균 도매 마진', value: averageMargin, unit: '%', digits: 1 },
                 ].map((stat, idx) => (
-                    <div key={stat.label} className={`flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5 ${idx === 0 ? 'col-span-2 sm:col-span-1' : ''}`}>
-                        <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">{stat.label}</span>
-                        <span className={`truncate text-xl font-black tabular-nums ${stat.value === '-' ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{stat.value}</span>
-                    </div>
+                    <StatCard
+                        key={stat.label}
+                        label={stat.label}
+                        value={stat.value === null ? <span className="text-slate-400">—</span> : stat.digits ? stat.value.toFixed(stat.digits) : stat.value.toLocaleString('ko-KR')}
+                        unit={stat.value === null ? undefined : stat.unit}
+                        className={idx === 0 ? 'col-span-2 sm:col-span-1' : ''}
+                    />
                 ))}
             </div>
 
@@ -493,24 +492,23 @@ export default function ProductionClient() {
                                 <span className="rounded-lg bg-slate-100 p-2 text-slate-600 dark:bg-[#252525] dark:text-gray-300">{chart.icon}</span>
                                 <h3 className="text-sm font-black text-slate-900 dark:text-white">{chart.title}</h3>
                             </div>
+                            {chartIndex === 2 && unitCostMissing ? (
+                                <div className="flex h-48 w-full items-center justify-center rounded-xl bg-slate-50 px-6 text-center text-xs font-bold text-slate-500 [text-wrap:balance] dark:bg-[#252525] dark:text-gray-400">
+                                    생산단가가 입력된 차수가 없습니다. 수량을 입력하면 계산됩니다.
+                                </div>
+                            ) : (
                             <div className="h-48 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     {chartIndex === 0 ? (
-                                        <AreaChart data={areaChartData} margin={CHART_MARGIN}>
-                                            <defs>
-                                                <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.12} />
-                                                    <stop offset="95%" stopColor={CHART_COLOR} stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
+                                        <LineChart data={areaChartData} margin={CHART_MARGIN}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                             <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontWeight: 'bold' }} />
                                             <YAxis hide />
                                             <Tooltip contentStyle={tooltipStyle} formatter={(value) => [Number(value).toLocaleString() + '원', '비용']} />
-                                            <Area type="monotone" dataKey="cost" stroke={CHART_COLOR} strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" dot={{ r: 3, fill: CHART_COLOR, strokeWidth: 0 }}>
+                                            <Line type="linear" dataKey="cost" stroke={CHART_COLOR} strokeWidth={2.5} dot={{ r: 3, fill: CHART_COLOR, strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }}>
                                                 <LabelList dataKey="cost" position="top" fill={CHART_LABEL_COLOR} fontSize={10} fontWeight={700} formatter={(value) => Number(value).toLocaleString()} />
-                                            </Area>
-                                        </AreaChart>
+                                            </Line>
+                                        </LineChart>
                                     ) : chartIndex === 1 ? (
                                         <LineChart data={barChartData} margin={CHART_MARGIN}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -534,13 +532,52 @@ export default function ProductionClient() {
                                     )}
                                 </ResponsiveContainer>
                             </div>
+                            )}
                         </div>
                     ))}
                 </div>
             )}
 
             {/* Table — on wide screens it fits, so overflow stays visible and the cost tooltip can rise above the first rows. */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none xl:overflow-visible">
+            {/* Phones: one card per batch so cost, quantity, unit cost and the actions stay on screen. */}
+            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm dark:divide-[#2a2a2a] dark:border-[#2a2a2a] dark:bg-[#1e1e1e] sm:hidden">
+                {loading ? (
+                    <li className="px-4 py-10 text-center text-[12px] font-bold text-slate-500 dark:text-gray-400">로딩 중...</li>
+                ) : batchError ? (
+                    <li className="px-4 py-10 text-center text-sm text-red-600" role="alert">{batchError} <button type="button" className="underline" onClick={fetchBatches}>다시 불러오기</button></li>
+                ) : (
+                    sortedBatches.map(batch => {
+                        const reviewReason = productionReviewReason(batch)
+                        const dateText = formatDate(batch.productionDate)
+                        return (
+                            <li key={batch.id} className="flex items-start gap-2 px-3 py-3">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">
+                                        {dateText}
+                                        {reviewReason ? <span title={reviewReason} className="inline-flex"><Badge tone="warning">검토</Badge><span className="sr-only">: {reviewReason}</span></span> : null}
+                                    </div>
+                                    <dl className="mt-1.5 grid grid-cols-3 gap-2 text-[11px]">
+                                        <div className="min-w-0"><dt className="font-bold text-slate-500">총 비용</dt><dd className="truncate text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">{batchTotalCost(batch).toLocaleString()}</dd></div>
+                                        <div className="min-w-0"><dt className="font-bold text-slate-500">수량</dt><dd className="truncate text-[13px] tabular-nums text-slate-900 dark:text-white">{batch.quantity.toLocaleString()}</dd></div>
+                                        <div className="min-w-0"><dt className="font-bold text-slate-500">단가</dt><dd className="truncate text-[13px] tabular-nums text-slate-900 dark:text-white">{batch.unitCost ? batch.unitCost.toLocaleString() : <span className="text-slate-400">-</span>}</dd></div>
+                                    </dl>
+                                    <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-slate-500">도매마진 <MarginBadge rate={productionMargin(batch.salesPrice, batch.unitCost)} /></p>
+                                </div>
+                                <div className="-mr-1 flex shrink-0 items-center">
+                                    <button type="button" onClick={() => handleEdit(batch)} className={buttonClass('ghost', 'iconMd')} title="수정" aria-label={`${dateText} 생산 기록 수정`}>
+                                        <Pencil size={16} />
+                                    </button>
+                                    <button type="button" onClick={() => handleDelete(batch.id)} className={buttonClass('dangerGhost', 'iconMd')} title="삭제" aria-label={`${dateText} 생산 기록 삭제`}>
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </li>
+                        )
+                    })
+                )}
+            </ul>
+
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:block xl:overflow-visible">
                 <div className="min-w-[800px]">
                     <table className="w-full text-left text-xs">
                         <thead className="ux-thead">
@@ -578,11 +615,11 @@ export default function ProductionClient() {
 
                                     return (
                                         <tr key={batch.id} className="group transition-colors even:bg-slate-50 hover:relative hover:z-10 hover:bg-slate-100 dark:even:bg-[#1a1a1a] dark:hover:bg-[#252525]">
-                                            <td className="border-r border-slate-200 px-3 py-2 text-center font-bold tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
+                                            <td className="px-3 py-2 text-center font-bold tabular-nums text-slate-900 dark:text-white">
                                                 {idx + 1}
                                             </td>
-                                            <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-bold tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
-                                                {new Date(batch.productionDate).toISOString().split('T')[0]}
+                                            <td className="whitespace-nowrap px-3 py-2 font-bold tabular-nums text-slate-900 dark:text-white">
+                                                {formatDate(batch.productionDate)}
                                                 {reviewReason && (
                                                     <span className="ml-1.5 inline-flex align-middle" title={reviewReason}>
                                                         <Badge tone="warning">검토</Badge>
@@ -591,7 +628,7 @@ export default function ProductionClient() {
                                                 )}
                                             </td>
                                             <td
-                                                className="group/cost relative cursor-pointer border-r border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-slate-900 transition-colors hover:bg-slate-200/60 dark:border-[#2a2a2a] dark:text-white dark:hover:bg-[#252525]"
+                                                className="group/cost relative cursor-pointer px-3 py-2 text-right font-bold tabular-nums text-slate-900 transition-colors hover:bg-slate-200/60 dark:text-white dark:hover:bg-[#252525]"
                                                 onClick={() => handleEdit(batch)}
                                             >
                                                 <span className="underline decoration-slate-300 decoration-dotted underline-offset-4">
@@ -645,30 +682,30 @@ export default function ProductionClient() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.quantity.toLocaleString()}</td>
-                                            <td className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
+                                            <td className="px-3 py-2 text-right tabular-nums text-slate-900 dark:text-white">{batch.quantity.toLocaleString()}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums text-slate-900 dark:text-white">
                                                 {batch.unitCost ? batch.unitCost.toLocaleString() : <span className="text-slate-400">-</span>}
                                             </td>
-                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.salesPrice?.toLocaleString() ?? <span className="text-slate-400">상품 연결 필요</span>}</td>
-                                            <td className="border-r border-slate-200 px-3 py-2 text-right dark:border-[#2a2a2a]">
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900 dark:text-white">{batch.salesPrice?.toLocaleString() ?? <span className="text-slate-400">상품 연결 필요</span>}</td>
+                                            <td className="px-3 py-2 text-right">
                                                 <MarginBadge rate={wMarginRate} />
                                             </td>
-                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.wholesalePrice?.toLocaleString() ?? <span className="text-slate-400">-</span>}</td>
-                                            <td className="border-r border-slate-200 px-3 py-2 text-right dark:border-[#2a2a2a]">
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="px-3 py-2 text-right tabular-nums text-slate-900 dark:text-white">{batch.wholesalePrice?.toLocaleString() ?? <span className="text-slate-400">-</span>}</td>
+                                            <td className="px-3 py-2 text-right">
                                                 <MarginBadge rate={rMarginRate} />
                                             </td>
-                                            <td className="max-w-[200px] truncate border-r border-slate-200 px-3 py-2 text-slate-700 dark:border-[#2a2a2a] dark:text-gray-300" title={batch.memo || ''}>{batch.memo || <span className="text-slate-400">-</span>}</td>
+                                            <td className="max-w-[200px] truncate px-3 py-2 text-slate-700 dark:text-gray-300" title={batch.memo || ''}>{batch.memo || <span className="text-slate-400">-</span>}</td>
                                             <td className="px-3 py-2 text-center">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <Button variant="secondary" size="sm" onClick={() => handleEdit(batch)}>수정</Button>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDelete(batch.id)}
-                                                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600')}
+                                                        className={buttonClass('dangerGhost', 'icon')}
                                                         title="삭제"
-                                                        aria-label={`${new Date(batch.productionDate).toISOString().split('T')[0]} 생산 기록 삭제`}
+                                                        aria-label={`${formatDate(batch.productionDate)} 생산 기록 삭제`}
                                                     >
-                                                        <Trash2 size={15} />
+                                                        <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -684,41 +721,34 @@ export default function ProductionClient() {
             )}
 
             {isCreating && (
-                <Modal labelledBy="production-record-modal-title" onClose={() => setIsCreating(false)} className="bg-black/40">
-                    <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
+                <Modal labelledBy="production-record-modal-title" onClose={() => setIsCreating(false)} className="bg-slate-950/50">
+                    <div className="flex h-full w-full items-end justify-center sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsCreating(false) }}>
                         <form
                             onSubmit={handleSubmit}
-                            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
                         >
                             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
-                                <h2 id="production-record-modal-title" className="text-base font-black text-slate-900">
+                                <h2 id="production-record-modal-title" className="text-lg font-extrabold text-slate-900">
                                     {isEditing ? '생산 기록 수정' : '생산 기록 등록'}
                                 </h2>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreating(false)}
-                                    aria-label="닫기"
-                                    className={buttonClass('ghost', 'sm', 'h-8 w-8 rounded-full px-0 text-slate-500')}
-                                >
-                                    <X size={16} />
-                                </button>
+                                <ModalCloseButton onClick={() => setIsCreating(false)} />
                             </div>
 
                             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
                                 <fieldset>
                                     <legend className={legendClass}>일정 및 생산 구분</legend>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <label className="block space-y-1">
+                                        <label className="block">
                                             <span className={fieldLabelClass}>생산일</span>
                                             <input
                                                 type="date"
                                                 required
-                                                className={`${fieldInputClass} font-bold`}
+                                                className={fieldInputClass}
                                                 value={formData.productionDate}
                                                 onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
                                             />
                                         </label>
-                                        <div className="space-y-1">
+                                        <div>
                                             <span className={fieldLabelClass}>생산 구분</span>
                                             <div className={readonlyFieldClass}>{activeTab}</div>
                                         </div>
@@ -729,24 +759,24 @@ export default function ProductionClient() {
                                     <legend className={legendClass}>비용 상세</legend>
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
-                                            <label className="block space-y-1">
+                                            <label className="block">
                                                 <span className={fieldLabelClass}>해외송금금액 (원)</span>
                                                 <input
                                                     type="text"
                                                     inputMode="numeric"
                                                     required
-                                                    className={`${fieldInputClass} text-right tabular-nums`}
+                                                    className={fieldClass('text-right tabular-nums')}
                                                     value={formatNumber(formData.rawMaterialCost)}
                                                     onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
                                                 />
                                             </label>
-                                            <label className="block space-y-1">
+                                            <label className="block">
                                                 <span className={fieldLabelClass}>송금액 (USD)</span>
                                                 <input
                                                     type="text"
                                                     inputMode="decimal"
                                                     placeholder="0.00"
-                                                    className={`${fieldInputClass} text-right tabular-nums`}
+                                                    className={fieldClass('text-right tabular-nums')}
                                                     value={formData.depositDollar}
                                                     onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
                                                 />
@@ -763,18 +793,18 @@ export default function ProductionClient() {
                                                 { label: '관세', key: 'customsDuty' },
                                                 { label: '부가세', key: 'vat' }
                                             ].map((field) => (
-                                                <label key={field.key} className="block space-y-1">
+                                                <label key={field.key} className="block">
                                                     <span className={fieldLabelClass}>{field.label}</span>
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"
-                                                        className={`${fieldInputClass} px-2.5 text-right tabular-nums`}
+                                                        className={fieldClass('px-2.5 text-right tabular-nums')}
                                                         value={formatNumber(formData[field.key as keyof typeof formData])}
                                                         onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
                                                     />
                                                 </label>
                                             ))}
-                                            <div className="col-span-2 space-y-1">
+                                            <div className="col-span-2">
                                                 <span className={fieldLabelClass}>환율 (해외송금금액/USD)</span>
                                                 <div className={`${readonlyFieldClass} justify-end tabular-nums`}>
                                                     {remittanceExchangeRate !== null
@@ -789,38 +819,30 @@ export default function ProductionClient() {
                                 <fieldset>
                                     <legend className={legendClass}>생산 결과</legend>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <label className="block space-y-1">
+                                        <label className="block">
                                             <span className={fieldLabelClass}>생산 수량</span>
                                             <input
                                                 type="text"
                                                 inputMode="numeric"
                                                 required
-                                                className={`${fieldInputClass} text-right font-black tabular-nums`}
+                                                className={fieldClass('text-right tabular-nums')}
                                                 value={formatNumber(formData.quantity)}
                                                 onChange={e => setFormData({ ...formData, quantity: parseNumber(e.target.value) })}
                                             />
                                         </label>
-                                        <div className="space-y-1">
+                                        <div>
                                             <span className={fieldLabelClass}>산출 단가</span>
-                                            <div className={`${readonlyFieldClass} justify-end font-black tabular-nums`}>
-                                                {(
-                                                    ((Number(parseNumber(formData.rawMaterialCost)) || 0) +
-                                                        (Number(parseNumber(formData.electricityCost)) || 0) +
-                                                        (Number(parseNumber(formData.packagingCost)) || 0) +
-                                                        (Number(parseNumber(formData.warehouseCost)) || 0) +
-                                                        (Number(parseNumber(formData.shippingCost)) || 0) +
-                                                        (Number(parseNumber(formData.customsFee)) || 0) +
-                                                        (Number(parseNumber(formData.customsDuty)) || 0) +
-                                                        (Number(parseNumber(formData.vat)) || 0)) /
-                                                    (Number(parseNumber(formData.quantity)) || 1)
-                                                ).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            {/* No quantity yet: show nothing rather than total ÷ 1, which reads like a real unit cost. */}
+                                            <div className={`${readonlyFieldClass} justify-end tabular-nums ${formQuantity > 0 ? 'font-black text-slate-900' : 'text-slate-400'}`}>
+                                                {formQuantity > 0 ? Math.round(formTotalCost / formQuantity).toLocaleString() : '-'}
                                             </div>
+                                            {formQuantity > 0 ? null : <p className="text-[11px] text-slate-400">수량 입력 시 계산</p>}
                                         </div>
                                     </div>
 
                                     <div className="mt-4 space-y-1">
                                         <label htmlFor="production-price-product" className={fieldLabelClass}>가격 기준 상품</label>
-                                        <select id="production-price-product" required disabled={priceLoading || saving} value={selectedProduct?.id || ''} onChange={event => setSelectedProductId(event.target.value)} className={fieldInputClass}>
+                                        <select id="production-price-product" required disabled={priceLoading || saving} value={selectedProduct?.id || ''} onChange={event => setSelectedProductId(event.target.value)} className={selectClass(!!selectedProduct)}>
                                             <option value="">{priceLoading ? '상품 가격 불러오는 중…' : '생산 상품을 선택하세요'}</option>
                                             {priceProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
                                         </select>
@@ -839,10 +861,10 @@ export default function ProductionClient() {
                                     </div>
                                 </fieldset>
 
-                                <label className="block space-y-1">
+                                <label className="block">
                                     <span className={fieldLabelClass}>특이사항</span>
                                     <textarea
-                                        className="h-16 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-brand-orange"
+                                        className={fieldClass('h-16 resize-none py-2')}
                                         placeholder="생산 관련 메모를 입력하세요"
                                         value={formData.memo || ''}
                                         onChange={e => setFormData({ ...formData, memo: e.target.value })}

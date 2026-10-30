@@ -1,13 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, MoveRight, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
 import type { Worker as TesseractWorker } from 'tesseract.js'
 import { Paperclip } from 'lucide-react'
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
+import Modal from '@/components/Modal'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass } from '@/components/ui/field'
 import { extractLatestAutomationStep, resolveRemittanceStageFromStep } from '@/lib/remittanceProgress'
 import {
     bestTrustedAwbCandidate,
@@ -29,8 +33,6 @@ type WormTypeId = 'blue' | 'red'
 type WormType = {
     id: WormTypeId
     label: string
-    /** Identification only (not a status): a small colour dot next to the name. */
-    dotClass: string
 }
 
 type WormEmailAttachment = {
@@ -601,16 +603,25 @@ function getPipelineModeLabel(mode: PipelineMode) {
     return '수동'
 }
 
-function getPipelineRuntimeBadgeClass(status: PipelineRuntimeStatus) {
-    if (status === 'done') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    if (status === 'active') return 'bg-blue-50 text-blue-700 border-blue-200'
-    return 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400 border-slate-200 dark:border-[#2a2a2a]'
+/** One label for a step's state, used by the step list and the detail card alike. */
+function getPipelineStepStatus(status: PipelineRuntimeStatus, isNext: boolean): { label: string; tone: BadgeTone } {
+    if (status === 'done') return { label: '완료', tone: 'success' }
+    if (isNext) return { label: '다음 단계', tone: 'warning' }
+    if (status === 'active') return { label: '진행중', tone: 'info' }
+    return { label: '대기', tone: 'neutral' }
 }
 
-function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
-    if (status === 'done') return '완료'
-    if (status === 'active') return '진행중'
-    return '대기'
+function PipelineStepStatusBadge({ status, isNext }: { status: PipelineRuntimeStatus; isNext: boolean }) {
+    const meta = getPipelineStepStatus(status, isNext)
+    return <Badge tone={meta.tone}>{meta.label}</Badge>
+}
+
+function PipelineModeBadge({ mode }: { mode: PipelineMode }) {
+    return (
+        <span className={`inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-bold leading-none ${getPipelineModeBadgeClass(mode)}`}>
+            {getPipelineModeLabel(mode)}
+        </span>
+    )
 }
 
 function getWormOrderStatusLabel(status: string) {
@@ -620,11 +631,11 @@ function getWormOrderStatusLabel(status: string) {
     return status
 }
 
-function getWormOrderStatusClass(status: string) {
-    if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    if (status === 'REMITTANCE_APPLIED') return 'bg-blue-50 text-blue-700 border-blue-200'
-    if (status === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200'
-    return 'bg-amber-100 text-amber-800 border-amber-200'
+function getWormOrderStatusTone(status: string): BadgeTone {
+    if (status === 'COMPLETED') return 'success'
+    if (status === 'REMITTANCE_APPLIED') return 'info'
+    if (status === 'DRAFT') return 'neutral'
+    return 'warning'
 }
 
 const WORM_SIZES: WormSize[] = [
@@ -642,12 +653,10 @@ const WORM_TYPES: WormType[] = [
     {
         id: 'blue',
         label: '청갯지렁이',
-        dotClass: 'bg-sky-500',
     },
     {
         id: 'red',
         label: '홍갯지렁이',
-        dotClass: 'bg-rose-500',
     },
 ]
 
@@ -780,13 +789,43 @@ function getCalendarMonthlyPriceInfo(month: number) {
     return CALENDAR_MONTHLY_PRICE_INFO_BY_MONTH.get(month) || null
 }
 
-function getCalendarPriceBadgeClass(colorType: CalendarPriceColorType, selected = false) {
-    if (selected) return 'bg-white/20 text-white border border-white/30'
-    if (colorType === 'stable') return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    if (colorType === 'rise') return 'bg-orange-50 text-orange-700 border border-orange-200'
-    if (colorType === 'spike') return 'bg-rose-50 text-rose-700 border border-rose-200'
-    if (colorType === 'pullback') return 'bg-amber-50 text-amber-700 border border-amber-200'
-    return 'bg-slate-100 text-slate-700 border border-slate-200'
+// Monthly price status is a neutral outline with a trend arrow: emerald is kept for 추천 납품일 and 완료,
+// red for 쉬는 날, so the price pill doesn't compete with either inside the calendar.
+function getCalendarPriceBadgeClass() {
+    return 'border border-slate-300 bg-white text-slate-700 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-gray-200'
+}
+
+function CalendarPriceTrendIcon({ colorType }: { colorType: CalendarPriceColorType }) {
+    const Icon = colorType === 'rise' || colorType === 'spike'
+        ? TrendingUp
+        : colorType === 'stable' || colorType === 'pullback'
+            ? TrendingDown
+            : MoveRight
+    return <Icon size={12} strokeWidth={2.4} aria-hidden="true" className="shrink-0 text-slate-500" />
+}
+
+type CalendarHolidayEntry = { country: 'kr' | 'cn'; name: string; startDay: number; endDay: number }
+
+/** Holidays of the shown month with consecutive days merged (e.g. 10/1–7 국경절), for the list under the calendar. */
+function buildMonthHolidayList(days: CalendarDayCell[]): CalendarHolidayEntry[] {
+    const entries: CalendarHolidayEntry[] = []
+    for (const cell of days) {
+        if (!cell.isCurrentMonth) continue
+        const ymd = formatLocalDateToYmd(cell.date)
+        const day = cell.date.getDate()
+        const found: Array<[CalendarHolidayEntry['country'], string | null]> = [
+            ['kr', getKoreanHolidayName(ymd)],
+            ['cn', getChineseHolidayName(ymd)],
+        ]
+        for (const [country, fullName] of found) {
+            if (!fullName) continue
+            const name = country === 'kr' ? fullName.split(' (')[0].replace(' 연휴', '') : (fullName.split(' ')[0] || fullName)
+            const previous = [...entries].reverse().find((entry) => entry.country === country)
+            if (previous && previous.name === name && previous.endDay === day - 1) previous.endDay = day
+            else entries.push({ country, name, startDay: day, endDay: day })
+        }
+    }
+    return entries.sort((a, b) => a.startDay - b.startDay || (a.country === 'kr' ? -1 : 1))
 }
 
 const HEAVY_RAIN_WEATHER_CODES = new Set<number>([65, 81, 82, 95, 96, 99])
@@ -1803,6 +1842,10 @@ export default function WormOrderPage() {
     const [validationError, setValidationError] = useState('')
     const [orderCreateError, setOrderCreateError] = useState('')
     const [orderCreateNotice, setOrderCreateNotice] = useState('')
+    // Survives the per-order state reset, so the user sees that 새 발주 actually created something.
+    const [newOrderToast, setNewOrderToast] = useState('')
+    const newOrderToastTimerRef = useRef<number | null>(null)
+    const [summaryFlash, setSummaryFlash] = useState(false)
     const [creatingOrder, setCreatingOrder] = useState(false)
     const [copied, setCopied] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
@@ -2940,6 +2983,13 @@ export default function WormOrderPage() {
         }
     }, [remittanceCandidatesOrder, fetchWormOrders])
 
+    const closeRemittanceCandidates = () => {
+        if (remittanceCandidatePicking) return
+        setRemittanceCandidates(null)
+        setRemittanceCandidatesOrder(null)
+        setRemittanceCandidateError('')
+    }
+
     const openManualRemittanceModal = useCallback((order: WormOrderListItem) => {
         const initialAppliedAt = (() => {
             const base = order.remittanceAppliedAt
@@ -3700,6 +3750,7 @@ export default function WormOrderPage() {
         () => buildMonthCalendarDays(calendarCursor.year, calendarCursor.month),
         [calendarCursor.month, calendarCursor.year],
     )
+    const calendarMonthHolidays = useMemo(() => buildMonthHolidayList(calendarDays), [calendarDays])
     const wormOrdersByReceiveDate = useMemo(() => {
         const grouped = new Map<string, WormOrderListItem[]>()
         wormOrderList.forEach((order) => {
@@ -4796,6 +4847,11 @@ export default function WormOrderPage() {
             }
 
             setOrderCreateNotice(`새 발주 생성 완료 · ${result?.order?.orderNumber || 'WO 생성'} (${targetReceiveDate})`)
+            setNewOrderToast(result?.order?.orderNumber ? `새 발주 ${result.order.orderNumber}을 만들었습니다` : '새 발주를 만들었습니다')
+            if (newOrderToastTimerRef.current) window.clearTimeout(newOrderToastTimerRef.current)
+            newOrderToastTimerRef.current = window.setTimeout(() => setNewOrderToast(''), 4000)
+            setSummaryFlash(true)
+            window.setTimeout(() => setSummaryFlash(false), 1500)
             if (result?.order?.id && result?.order?.orderNumber) {
                 writeStoredActiveWormOrderId(result.order.id)
                 writeUrlActiveWormOrderId(result.order.id)
@@ -4945,14 +5001,14 @@ export default function WormOrderPage() {
                                         isFirst ? '' : `before:absolute before:left-[29px] before:top-0 before:h-6 before:w-0.5 ${isStepDone(step.id - 1) ? 'before:bg-emerald-400' : 'before:bg-slate-200'}`
                                     } ${
                                         isLast ? '' : `after:absolute after:bottom-0 after:left-[29px] after:top-6 after:w-0.5 ${isStepDone(step.id) ? 'after:bg-emerald-400' : 'after:bg-slate-200'}`
-                                    } ${isCurrent ? 'bg-brand-orange-soft' : 'hover:bg-slate-50'}`}
+                                    } ${isCurrent ? 'bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)]' : 'hover:bg-slate-50'}`}
                                     title={step.summary}
                                 >
                                     <span className={`relative z-[1] mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black tabular-nums ${
                                         runtimeStatus === 'done'
                                             ? 'bg-emerald-500 text-white'
                                             : isCurrent
-                                                ? 'bg-brand-orange text-white'
+                                                ? 'bg-slate-900 text-white'
                                                 : 'border border-slate-300 bg-white text-slate-600'
                                     }`}>
                                         {step.id}
@@ -4962,12 +5018,8 @@ export default function WormOrderPage() {
                                             {step.title}
                                         </span>
                                         <span className="mt-1 flex flex-wrap items-center gap-1">
-                                            <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[11px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
-                                                {getPipelineModeLabel(step.mode)}
-                                            </span>
-                                            <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                                {isNext && runtimeStatus !== 'done' ? '다음 단계' : getPipelineRuntimeLabel(runtimeStatus)}
-                                            </span>
+                                            <PipelineModeBadge mode={step.mode} />
+                                            <PipelineStepStatusBadge status={runtimeStatus} isNext={isNext} />
                                         </span>
                                     </span>
                                 </button>
@@ -5020,7 +5072,16 @@ export default function WormOrderPage() {
                 }
             />
 
-            <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+                {newOrderToast ? (
+                    <p className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xl">
+                        <CheckCircle2 size={16} className="shrink-0 text-emerald-400" aria-hidden="true" />
+                        {newOrderToast}
+                    </p>
+                ) : null}
+            </div>
+
+            <section className={`rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-shadow duration-500 ${summaryFlash ? 'ring-2 ring-emerald-300' : ''}`}>
                 {orderCreateNotice && (
                     <p className="mb-2 px-3 text-xs font-semibold text-emerald-700">
                         {orderCreateNotice}
@@ -5060,15 +5121,8 @@ export default function WormOrderPage() {
                     </div>
                     <div className="min-w-0 px-3 py-3">
                         <p className="text-[11px] font-bold text-slate-600">발주 수량</p>
-                        <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                            {wormTypeTotals.map((wormType) => (
-                                <span key={wormType.id} className="inline-flex h-6 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-2 text-[11px] font-bold text-slate-700">
-                                    <span aria-hidden="true" className={`h-2 w-2 rounded-full ${wormType.dotClass}`} />
-                                    {wormType.label} <span className="tabular-nums">{wormType.total}</span>
-                                </span>
-                            ))}
-                        </div>
+                        <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{totalBoxes.toLocaleString('ko-KR')}<span className="ml-0.5 text-sm font-bold text-slate-500">박스</span></p>
+                        <p className="text-xs font-semibold text-slate-500">종류별 수량은 발주서 표에서 확인</p>
                     </div>
                 </div>
             </section>
@@ -5076,17 +5130,12 @@ export default function WormOrderPage() {
             <div className="grid min-w-0 gap-4 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
             <div className="sticky top-[68px] hidden self-start md:block lg:top-[76px]">{workflowFlowPanel}</div>
             {orderListOpen && (
-            <>
-            <button
-                type="button"
-                className="fixed inset-0 z-50 bg-slate-950/35"
-                onClick={() => setOrderListOpen(false)}
-                aria-label="발주 리스트 닫기"
-            />
-            <section role="dialog" aria-modal="true" aria-label="발주 리스트" className="fixed inset-y-0 right-0 z-[51] w-full max-w-[900px] overflow-y-auto border-l border-slate-200 bg-white p-4 shadow-2xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:p-6">
+            <Modal labelledBy="worm-order-list-title" onClose={() => setOrderListOpen(false)} className="bg-slate-950/50">
+            <div className="flex h-full w-full justify-end" onMouseDown={(event) => { if (event.target === event.currentTarget) setOrderListOpen(false) }}>
+            <section className="h-full w-full max-w-[900px] overflow-y-auto border-l border-slate-200 bg-white p-4 shadow-2xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:p-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">발주 리스트</h2>
+                        <h2 id="worm-order-list-title" className="text-lg font-extrabold text-slate-950 dark:text-white">발주 리스트</h2>
                         <p className="mt-1 text-sm font-medium text-slate-500 dark:text-gray-400">작업할 발주를 선택하세요.</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -5098,14 +5147,7 @@ export default function WormOrderPage() {
                         >
                             새로고침
                         </Button>
-                        <button
-                            type="button"
-                            onClick={() => setOrderListOpen(false)}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
-                            aria-label="닫기"
-                        >
-                            <X size={18} />
-                        </button>
+                        <ModalCloseButton onClick={() => setOrderListOpen(false)} />
                     </div>
                 </div>
 
@@ -5120,12 +5162,12 @@ export default function WormOrderPage() {
                                     onClick={() => setSelectedWormOrderYearMonth(group.value)}
                                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-black transition ${
                                         selected
-                                            ? 'border-brand-orange bg-brand-orange text-white shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-[#ffd7cc] hover:bg-[#fff7f3] hover:text-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
+                                            ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
                                     }`}
                                 >
                                     <span>{group.year}년 {Number(group.month)}월</span>
-                                    <span className={selected ? 'text-red-100' : 'text-slate-400'}>{group.count}</span>
+                                    <span className={selected ? 'text-slate-300' : 'text-slate-400'}>{group.count}</span>
                                 </button>
                             )
                         })}
@@ -5194,9 +5236,9 @@ export default function WormOrderPage() {
                                         </td>
                                         <td className="px-2 py-6 align-middle">
                                             <div className="flex flex-col gap-2">
-                                                <span className={`inline-flex h-7 w-fit items-center rounded-lg border px-2.5 text-xs font-black ${getWormOrderStatusClass(order.status)}`}>
+                                                <Badge tone={getWormOrderStatusTone(order.status)} className="w-fit">
                                                     {getWormOrderStatusLabel(order.status)}
-                                                </span>
+                                                </Badge>
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                                                         신청 {formatSafeDateTime(order.remittanceAppliedAt, {
@@ -5258,7 +5300,7 @@ export default function WormOrderPage() {
                                                     </>
                                                 )}
                                                 <Button
-                                                    variant="danger"
+                                                    variant="dangerGhost"
                                                     size="sm"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
@@ -5293,7 +5335,8 @@ export default function WormOrderPage() {
                     모든 금액은 실시간 환율을 기준으로 계산되며, 실제 송금 시점의 환율에 따라 변동될 수 있습니다.
                 </div>
             </section>
-            </>
+            </div>
+            </Modal>
             )}
 
             <div className="flex min-w-0 flex-col gap-4 md:col-start-2 md:row-start-1">
@@ -5314,7 +5357,7 @@ export default function WormOrderPage() {
                                     aria-current={selected ? 'step' : undefined}
                                     className={`inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-bold ${
                                         selected
-                                            ? 'border-brand-orange bg-brand-orange text-white'
+                                            ? 'border-slate-900 bg-slate-900 text-white'
                                             : runtimeStatus === 'done'
                                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                                 : 'border-slate-200 bg-white text-slate-600'
@@ -5332,18 +5375,14 @@ export default function WormOrderPage() {
                 <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
-                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-orange text-sm font-black tabular-nums text-white">
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black tabular-nums text-white">
                                 {selectedStepDefinition.id}
                             </span>
                             <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h2 className="text-lg font-black text-slate-950">{selectedStepDefinition.title}</h2>
-                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineModeBadgeClass(selectedStepDefinition.mode)}`}>
-                                        {getPipelineModeLabel(selectedStepDefinition.mode)}
-                                    </span>
-                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[selectedStepDefinition.id])}`}>
-                                        {getPipelineRuntimeLabel(pipelineStatusMap[selectedStepDefinition.id])}
-                                    </span>
+                                <h2 className="text-lg font-black leading-snug text-slate-950">{selectedStepDefinition.title}</h2>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                    <PipelineModeBadge mode={selectedStepDefinition.mode} />
+                                    <PipelineStepStatusBadge status={pipelineStatusMap[selectedStepDefinition.id]} isNext={selectedStepDefinition.id === activeStepId} />
                                 </div>
                                 <p className="mt-1 text-sm font-medium text-slate-600">{selectedStepDefinition.summary}</p>
                             </div>
@@ -5389,9 +5428,7 @@ export default function WormOrderPage() {
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <p className="text-sm font-black text-slate-900">{step.title}</p>
-                                        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[step.id])}`}>
-                                            {getPipelineRuntimeLabel(pipelineStatusMap[step.id])}
-                                        </span>
+                                        <PipelineStepStatusBadge status={pipelineStatusMap[step.id]} isNext={step.id === activeStepId} />
                                     </div>
                                     <p className="mt-1 text-xs font-medium text-slate-500">{step.summary}</p>
                                     <p className="mt-2 text-[11px] font-bold text-slate-500">담당 · {step.owner}</p>
@@ -5443,19 +5480,20 @@ export default function WormOrderPage() {
                                             return { year: prev.year, month: nextMonth }
                                         })
                                     }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-[#252525] inline-flex items-center justify-center"
+                                    className={buttonClass('secondary', 'icon', 'dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]')}
                                     aria-label="이전 달"
                                 >
-                                    <ChevronLeft size={14} />
+                                    <ChevronLeft size={16} />
                                 </button>
                                 <div className="flex flex-col items-center gap-1 px-2">
                                     <p className="text-sm font-black text-slate-900 dark:text-white">{calendarMonthLabel}</p>
                                     {calendarMonthPriceInfo && (
                                         <span
-                                            className={`inline-flex max-w-[168px] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-black leading-none ${getCalendarPriceBadgeClass(calendarMonthPriceInfo.colorType)}`}
+                                            className={`inline-flex max-w-[168px] items-center justify-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black leading-none ${getCalendarPriceBadgeClass()}`}
                                             title={calendarMonthPriceInfo.memo}
                                         >
-                                            {calendarMonthPriceInfo.priceStatus}
+                                            <CalendarPriceTrendIcon colorType={calendarMonthPriceInfo.colorType} />
+                                            <span className="truncate">{calendarMonthPriceInfo.priceStatus}</span>
                                         </span>
                                     )}
                                 </div>
@@ -5468,10 +5506,10 @@ export default function WormOrderPage() {
                                             return { year: prev.year, month: nextMonth }
                                         })
                                     }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-[#252525] inline-flex items-center justify-center"
+                                    className={buttonClass('secondary', 'icon', 'dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]')}
                                     aria-label="다음 달"
                                 >
-                                    <ChevronRight size={14} />
+                                    <ChevronRight size={16} />
                                 </button>
                             </div>
 
@@ -5481,10 +5519,10 @@ export default function WormOrderPage() {
                                 ))}
                             </div>
                             <div className="mt-1 grid grid-cols-7 gap-1">
-                                {calendarDays.map((dayCell) => {
+                                {calendarDays.map((dayCell, cellIndex) => {
                                     const ymd = formatLocalDateToYmd(dayCell.date)
                                     const ordersOnDate = wormOrdersByReceiveDate.get(ymd) || []
-                                    const hasOrderOnDate = ordersOnDate.length > 0 && dayCell.isCurrentMonth
+                                    const hasOrderOnDate = ordersOnDate.length > 0
                                     const isSelected = receiveDate === ymd
                                     const isMonthStart = dayCell.date.getDate() === 1
                                     const dayStart = new Date(
@@ -5497,27 +5535,24 @@ export default function WormOrderPage() {
                                     const dayWeather = calendarWeatherByDate[ymd]
                                     const shanghaiWeather = dayWeather?.shanghai || null
                                     const busanGangseoWeather = dayWeather?.busanGangseo || null
-                                    const rainLevel = !isSelected && dayCell.isCurrentMonth
-                                        ? classifyDayPrecipitation(shanghaiWeather, busanGangseoWeather)
-                                        : null
+                                    // Owner rules apply to every cell, including the next month's days shown at the end of the grid.
+                                    const rainLevel = classifyDayPrecipitation(shanghaiWeather, busanGangseoWeather)
                                     const rainBgClass = getCalendarRainBgClass(rainLevel)
                                     const dayOfWeek = dayCell.date.getDay()
-                                    const chineseHolidayName = dayCell.isCurrentMonth ? getChineseHolidayName(ymd) : null
-                                    const koreanHolidayName = dayCell.isCurrentMonth ? getKoreanHolidayName(ymd) : null
+                                    const chineseHolidayName = getChineseHolidayName(ymd)
+                                    const koreanHolidayName = getKoreanHolidayName(ymd)
                                     const isPublicHoliday = Boolean(chineseHolidayName || koreanHolidayName)
                                     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
                                     const isRedDay = isWeekend || isPublicHoliday
                                     const RED_DAY_BG = 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
                                     // Priority: 빨간 날(주말/공휴일) > 비/폭우 > 금요일 > 기본 흰색
                                     let cellBgClass = ''
-                                    if (!isSelected && dayCell.isCurrentMonth) {
-                                        if (isRedDay) {
-                                            cellBgClass = RED_DAY_BG
-                                        } else if (rainBgClass) {
-                                            cellBgClass = rainBgClass
-                                        } else if (dayOfWeek === 5) {
-                                            cellBgClass = getCalendarDayOfWeekBgClass(dayOfWeek)
-                                        }
+                                    if (isRedDay) {
+                                        cellBgClass = RED_DAY_BG
+                                    } else if (rainBgClass) {
+                                        cellBgClass = rainBgClass
+                                    } else if (dayOfWeek === 5) {
+                                        cellBgClass = getCalendarDayOfWeekBgClass(dayOfWeek)
                                     }
                                     const nextDay = new Date(dayCell.date)
                                     nextDay.setDate(nextDay.getDate() + 1)
@@ -5531,13 +5566,20 @@ export default function WormOrderPage() {
                                         : null
                                     const isGoodDeliveryDay =
                                         !isPast &&
-                                        dayCell.isCurrentMonth &&
                                         !rainLevel &&
                                         !nextDayRainLevel &&
                                         !isPublicHoliday &&
                                         dayOfWeek !== 0 &&
                                         dayOfWeek !== 5 &&
                                         dayOfWeek !== 6
+                                    // Other months' days are told apart by a grey number, and "11/1" where the month changes.
+                                    const dayLabel = !dayCell.isCurrentMonth && (isMonthStart || cellIndex === 0)
+                                        ? `${dayCell.date.getMonth() + 1}/${dayCell.date.getDate()}`
+                                        : String(dayCell.date.getDate())
+                                    const holidayTags = [
+                                        koreanHolidayName ? { key: 'kr', full: `한국 공휴일: ${koreanHolidayName}`, label: getKoreanHolidayShortLabel(koreanHolidayName) } : null,
+                                        chineseHolidayName ? { key: 'cn', full: `중국 공휴일: ${chineseHolidayName}`, label: getChineseHolidayShortLabel(chineseHolidayName) } : null,
+                                    ].filter((tag): tag is { key: string; full: string; label: string } => tag !== null)
                                     const cellTooltip = (() => {
                                         const parts = [monthPriceTooltip]
                                         if (ordersOnDate.length > 0) {
@@ -5559,87 +5601,78 @@ export default function WormOrderPage() {
                                             }}
                                             disabled={isPast}
                                             title={cellTooltip}
-                                            className={`min-h-[74px] min-w-0 overflow-hidden rounded-lg px-1 py-1 text-left transition-colors sm:px-1.5 ${
-                                                isSelected
-                                                    ? 'bg-brand-orange text-white'
-                                                    : dayCell.isCurrentMonth
-                                                        ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
-                                                        : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
-                                            } ${hasOrderOnDate ? 'border-2 border-brand-orange shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                            aria-pressed={isSelected}
+                                            className={`relative min-h-[74px] min-w-0 overflow-hidden rounded-lg border px-1 py-1 text-left text-slate-700 transition-colors sm:px-1.5 ${
+                                                cellBgClass || (dayCell.isCurrentMonth
+                                                    ? 'border-slate-200 bg-white hover:bg-slate-100 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:hover:bg-[#252525]')
+                                            } ${
+                                                // Selection is a dark ring that keeps the day's colour; red stays for days off only.
+                                                isSelected ? 'z-[1] ring-2 ring-slate-900 ring-offset-1 dark:ring-white dark:ring-offset-[#1e1e1e]' : ''
+                                            } ${isPast ? 'cursor-not-allowed opacity-60' : ''}`}
                                         >
                                             <div className="flex h-full min-w-0 flex-col">
-                                                <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
-                                                    <span className={`inline-flex shrink-0 items-center justify-center text-[11px] font-black tabular-nums ${
-                                                        isGoodDeliveryDay && !isSelected
-                                                            ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                                                            : isSelected
-                                                                ? 'text-white'
-                                                                : 'text-slate-700 dark:text-gray-300'
-                                                    }`}>
-                                                        {dayCell.date.getDate()}
+                                                <div className="flex min-w-0 items-center gap-0.5">
+                                                    <span className={`inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center whitespace-nowrap rounded-full text-[11px] font-black tabular-nums ${
+                                                        isGoodDeliveryDay
+                                                            ? 'border-[1.5px] border-emerald-500 px-0.5 text-emerald-700 dark:text-emerald-400'
+                                                            : dayCell.isCurrentMonth
+                                                                ? 'text-slate-700 dark:text-gray-300'
+                                                                : 'text-slate-400 dark:text-gray-500'
+                                                    } ${isPast && !isGoodDeliveryDay ? 'line-through decoration-slate-300' : ''}`}>
+                                                        {dayLabel}
                                                     </span>
-                                                    {isPublicHoliday && (
-                                                        <span aria-hidden="true" className="inline-flex gap-0.5 sm:hidden">
-                                                            {koreanHolidayName && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`} />}
-                                                            {chineseHolidayName && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/70' : 'bg-rose-400'}`} />}
-                                                        </span>
-                                                    )}
-                                                    {koreanHolidayName && (
-                                                        <span
-                                                            className={`hidden max-w-full truncate rounded px-1 py-[1px] text-[9px] font-black leading-none sm:inline-block ${
-                                                                isSelected
-                                                                    ? 'bg-white/20 text-white border border-white/30'
-                                                                    : 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'
-                                                            }`}
-                                                            title={`한국 공휴일: ${koreanHolidayName}`}
-                                                        >
-                                                            {getKoreanHolidayShortLabel(koreanHolidayName)}
-                                                        </span>
-                                                    )}
-                                                    {chineseHolidayName && (
-                                                        <span
-                                                            className={`hidden max-w-full truncate rounded px-1 py-[1px] text-[9px] font-black leading-none sm:inline-block ${
-                                                                isSelected
-                                                                    ? 'bg-white/20 text-white border border-white/30'
-                                                                    : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800'
-                                                            }`}
-                                                            title={`중국 공휴일: ${chineseHolidayName}`}
-                                                        >
-                                                            {getChineseHolidayShortLabel(chineseHolidayName)}
+                                                    {hasOrderOnDate && (
+                                                        <span className="ml-auto shrink-0 rounded bg-slate-900 px-1 text-[9px] font-black leading-[14px] text-white dark:bg-white dark:text-slate-900">
+                                                            발주
                                                         </span>
                                                     )}
                                                 </div>
-                                                {isMonthStart && (
-                                                    <span
-                                                        className={`mt-1 inline-flex max-w-full items-center rounded-full px-1.5 py-[1px] text-[9px] font-black leading-none truncate ${getCalendarPriceBadgeClass(dayCell.colorType, isSelected)}`}
-                                                        title={dayCell.memo}
-                                                    >
-                                                        {dayCell.priceStatus}
-                                                    </span>
-                                                )}
-                                                <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
-                                                    isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
-                                                }`}>
+                                                {/* Fixed-height tag row so the weather lines start at the same height in every cell.
+                                                    Korean holidays are filled red, Chinese ones outlined with 中. */}
+                                                <div className="mt-0.5 flex h-4 min-w-0 flex-nowrap items-center gap-0.5 overflow-hidden">
+                                                    {holidayTags.map((tag, tagIndex) => (
+                                                        <span
+                                                            key={tag.key}
+                                                            title={tag.full}
+                                                            className={`min-w-0 truncate rounded px-[3px] text-[9px] font-black leading-[13px] ${tagIndex > 0 ? 'hidden sm:inline-block' : 'inline-block'} ${
+                                                                tag.key === 'kr'
+                                                                    ? 'border border-red-600 bg-red-600 text-white'
+                                                                    : 'border border-red-300 bg-white text-red-700 dark:bg-transparent dark:text-red-300'
+                                                            }`}
+                                                        >
+                                                            {tag.key === 'cn' ? '中 ' : ''}
+                                                            <span className="sm:hidden">{tag.label.replace('…', '').slice(0, 2)}</span>
+                                                            <span className="hidden sm:inline">{tag.label}</span>
+                                                        </span>
+                                                    ))}
+                                                    {holidayTags.length > 1 && (
+                                                        <span className="shrink-0 text-[9px] font-black leading-none text-red-700 sm:hidden">+{holidayTags.length - 1}</span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-auto space-y-0.5 pt-1 text-[9px] font-semibold leading-[1.2] text-slate-500 dark:text-gray-400">
                                                     {(() => {
                                                         const shanghaiIcon = getCalendarWeatherIcon(shanghaiWeather)
                                                         const busanIcon = getCalendarWeatherIcon(busanGangseoWeather)
                                                         const shanghaiTitle = shanghaiWeather ? `상해 ${formatCalendarWeatherText(shanghaiWeather)}` : '상해 -'
                                                         const busanTitle = busanGangseoWeather ? `부산 ${formatCalendarWeatherText(busanGangseoWeather)}` : '부산 -'
+                                                        // Past days keep the icons only; the temperatures would be washed-out noise.
+                                                        const tempClass = isPast ? 'hidden' : 'hidden min-w-0 truncate tabular-nums sm:inline'
                                                         return (
                                                             <>
                                                                 <p className="flex min-w-0 items-center gap-1" title={shanghaiTitle}>
                                                                     <span className="hidden shrink-0 sm:inline">상해</span>
                                                                     {shanghaiIcon ? (
-                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} aria-label={shanghaiTitle} className={isSelected ? 'text-white/95 shrink-0' : `${shanghaiIcon.colorClass} shrink-0`} />
+                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} aria-label={shanghaiTitle} className={`${shanghaiIcon.colorClass} shrink-0`} />
                                                                     ) : null}
-                                                                    <span className="hidden min-w-0 truncate tabular-nums sm:inline">{formatCalendarWeatherTempText(shanghaiWeather)}</span>
+                                                                    <span className={tempClass}>{formatCalendarWeatherTempText(shanghaiWeather)}</span>
                                                                 </p>
                                                                 <p className="flex min-w-0 items-center gap-1" title={busanTitle}>
                                                                     <span className="hidden shrink-0 sm:inline">부산</span>
                                                                     {busanIcon ? (
-                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} aria-label={busanTitle} className={isSelected ? 'text-white/95 shrink-0' : `${busanIcon.colorClass} shrink-0`} />
+                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} aria-label={busanTitle} className={`${busanIcon.colorClass} shrink-0`} />
                                                                     ) : null}
-                                                                    <span className="hidden min-w-0 truncate tabular-nums sm:inline">{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
+                                                                    <span className={tempClass}>{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
                                                                 </p>
                                                             </>
                                                         )
@@ -5651,12 +5684,31 @@ export default function WormOrderPage() {
                                 })}
                             </div>
 
+                            {calendarMonthHolidays.length > 0 && (
+                                <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
+                                    <span className="font-bold text-slate-700 dark:text-gray-300">이번 달 공휴일</span>
+                                    {calendarMonthHolidays.map((holiday) => (
+                                        <span key={`${holiday.country}-${holiday.startDay}-${holiday.name}`} className="inline-flex items-center gap-1 whitespace-nowrap">
+                                            <span
+                                                aria-hidden="true"
+                                                className={`h-2.5 w-2.5 rounded-sm ${holiday.country === 'kr' ? 'bg-red-600' : 'border border-red-300 bg-white'}`}
+                                            />
+                                            <span className="tabular-nums">
+                                                {calendarCursor.month + 1}/{holiday.startDay}{holiday.endDay > holiday.startDay ? `–${holiday.endDay}` : ''}
+                                            </span>
+                                            {holiday.name}({holiday.country === 'kr' ? '한' : '중'})
+                                        </span>
+                                    ))}
+                                </p>
+                            )}
+
                             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-slate-600 dark:text-gray-400">
                                 <span>선택된 납품 예정일 <strong className="font-black tabular-nums text-slate-900 dark:text-white">{receiveDate || '-'}</strong></span>
                                 {selectedDatePriceInfo && (
                                     <span className="inline-flex min-w-0 items-center gap-1.5">
                                         월별 가격
-                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black ${getCalendarPriceBadgeClass(selectedDatePriceInfo.colorType)}`}>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black ${getCalendarPriceBadgeClass()}`}>
+                                            <CalendarPriceTrendIcon colorType={selectedDatePriceInfo.colorType} />
                                             {selectedDatePriceInfo.priceStatus}
                                         </span>
                                         <span className="min-w-0 text-[11px] text-slate-500 dark:text-gray-400">{selectedDatePriceInfo.memo}</span>
@@ -5664,7 +5716,9 @@ export default function WormOrderPage() {
                                 )}
                             </div>
                             <p className="mt-1.5 text-[11px] text-slate-400">
-                                <span className="sm:hidden">날씨 아이콘은 위가 상해, 아래가 부산입니다. 점은 공휴일(빨강 한국 · 분홍 중국)입니다. </span>
+                                <span className="inline-flex items-center gap-1 align-middle"><span aria-hidden="true" className="inline-block h-3 w-3 rounded-full border-[1.5px] border-emerald-500" />추천 납품일</span>
+                                {' · '}
+                                <span className="sm:hidden">날씨 아이콘은 위가 상해, 아래가 부산입니다. </span>
                                 {calendarWeatherLoading ? '날씨 정보를 최신으로 갱신 중...' : '날씨 정보는 접속 시마다 최신으로 갱신됩니다.'}
                             </p>
                             {calendarWeatherError && (
@@ -5673,7 +5727,7 @@ export default function WormOrderPage() {
                         </section>
 
                         <div className="space-y-3">
-                            <h3 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">사이즈별 수량 (boxes)</h3>
+                            <h3 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">사이즈별 수량 (박스)</h3>
                             <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
                                 <table className="w-full min-w-[300px] text-sm">
                                     <thead className="ux-thead">
@@ -5682,7 +5736,6 @@ export default function WormOrderPage() {
                                             {wormTypeTotals.map((wormType) => (
                                                 <th key={`head-${wormType.id}`} className="w-[38%] text-center sm:w-[180px]">
                                                     <span className="inline-flex items-center gap-1.5">
-                                                        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${wormType.dotClass}`} />
                                                         {wormType.label}
                                                         <span className="tabular-nums text-slate-400">{wormType.total}</span>
                                                     </span>
@@ -5771,12 +5824,9 @@ export default function WormOrderPage() {
                         )}
                     </div>
 
-                    <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-b-2xl border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-[#2a2a2a] dark:bg-[#1e1e1e]/95 md:px-6">
+                    <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:px-6">
                         <p className="min-w-0 text-sm font-bold text-slate-600 dark:text-gray-300">
-                            총 <span className="text-lg font-black tabular-nums text-slate-950 dark:text-white">{totalBoxes.toLocaleString('ko-KR')}</span> boxes
-                            <span className="ml-2 hidden text-xs font-semibold text-slate-500 sm:inline">
-                                {wormTypeTotals.map((wormType) => `${wormType.label} ${wormType.total}`).join(' · ')}
-                            </span>
+                            총 <span className="text-lg font-black tabular-nums text-slate-950 dark:text-white">{totalBoxes.toLocaleString('ko-KR')}</span> 박스
                         </p>
                         <button
                             type="button"
@@ -6404,7 +6454,7 @@ export default function WormOrderPage() {
                                                                 if (event.key === 'Enter') void handleSaveManualAwb()
                                                             }}
                                                             placeholder="AWB 11자리 직접 입력"
-                                                            className="h-10 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-brand-orange"
+                                                            className={fieldClass('min-w-0 w-auto')}
                                                         />
                                                         <button
                                                             type="button"
@@ -6516,7 +6566,7 @@ export default function WormOrderPage() {
                                     value={transferAmountUsd}
                                     onChange={(event) => setTransferAmountUsd(event.target.value)}
                                     placeholder="예: 5800.00"
-                                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-brand-orange"
+                                    className={fieldClass('dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white')}
                                 />
                             </div>
                             <div className="space-y-1">
@@ -6786,7 +6836,7 @@ export default function WormOrderPage() {
                             }
                         }}
                         placeholder={autoBlNumber ? `매칭된 AWB: ${autoBlNumber} (위 버튼으로 불러오기)` : 'B/L 번호 입력 (예: 94000499505)'}
-                        className="flex-1 h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                        className={fieldClass('h-11 flex-1 w-auto')}
                     />
                     <button
                         type="button"
@@ -6989,7 +7039,7 @@ export default function WormOrderPage() {
                                 value={forwardEmail}
                                 onChange={(event) => setForwardEmail(event.target.value)}
                                 placeholder={DEFAULT_CUSTOMS_FORWARD_EMAIL}
-                                className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                className={fieldClass()}
                             />
                             <p className="text-[11px] text-slate-500 dark:text-gray-400">기본값: {DEFAULT_CUSTOMS_FORWARD_EMAIL} (필요 시 변경 가능)</p>
                         </div>
@@ -7001,7 +7051,7 @@ export default function WormOrderPage() {
                                     type="date"
                                     value={customsForwardDate}
                                     onChange={(event) => setCustomsForwardDate(event.target.value)}
-                                    className="h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                    className={fieldClass('w-auto')}
                                 />
                                 <button
                                     type="button"
@@ -7063,41 +7113,22 @@ export default function WormOrderPage() {
             </div>
 
             {remittanceCandidates && remittanceCandidatesOrder && (
+                <Modal labelledBy="worm-remittance-candidates-title" onClose={closeRemittanceCandidates} className="bg-slate-950/50">
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-                    onClick={() => {
-                        if (remittanceCandidatePicking) return
-                        setRemittanceCandidates(null)
-                        setRemittanceCandidatesOrder(null)
-                        setRemittanceCandidateError('')
-                    }}
+                    className="flex h-full w-full items-end justify-center sm:items-center sm:p-5"
+                    onMouseDown={(event) => { if (event.target === event.currentTarget) closeRemittanceCandidates() }}
                 >
-                    <div
-                        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[85vh] flex flex-col"
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
                             <div>
-                                <h3 className="text-base font-black text-slate-900">모인 거래내역에서 직접 선택</h3>
+                                <h3 id="worm-remittance-candidates-title" className="text-lg font-extrabold text-slate-900">모인 거래내역에서 직접 선택</h3>
                                 <p className="text-[11px] text-slate-500 mt-0.5">
                                     {remittanceCandidatesOrder.orderNumber} · 자동 매칭이 어려워 후보를 보여드립니다. 발주에 해당하는 거래를 클릭해 주세요.
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (remittanceCandidatePicking) return
-                                    setRemittanceCandidates(null)
-                                    setRemittanceCandidatesOrder(null)
-                                    setRemittanceCandidateError('')
-                                }}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
-                                aria-label="닫기"
-                            >
-                                <X size={16} />
-                            </button>
+                            <ModalCloseButton onClick={closeRemittanceCandidates} />
                         </div>
-                        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+                        <div className="min-h-0 flex-1 px-5 py-4 space-y-2 overflow-y-auto">
                             {remittanceCandidates.map((candidate, index) => {
                                 const tid = candidate.transactionId || ''
                                 const isPicking = remittanceCandidatePicking === tid
@@ -7169,84 +7200,76 @@ export default function WormOrderPage() {
                         </div>
                     </div>
                 </div>
+                </Modal>
             )}
 
             {manualRemittanceOrder && (
+                <Modal labelledBy="worm-manual-remittance-title" onClose={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }} className="bg-slate-950/50">
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-                    onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                    className="flex h-full w-full items-end justify-center sm:items-center sm:p-5"
+                    onMouseDown={(event) => { if (event.target === event.currentTarget && !manualRemittanceSaving) setManualRemittanceOrder(null) }}
                 >
-                    <div
-                        className="w-full max-w-md rounded-2xl bg-white shadow-xl"
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
                             <div>
-                                <h3 className="text-base font-black text-slate-900">송금정보 직접 입력</h3>
+                                <h3 id="worm-manual-remittance-title" className="text-lg font-extrabold text-slate-900">송금정보 직접 입력</h3>
                                 <p className="text-[11px] text-slate-500 mt-0.5">{manualRemittanceOrder.orderNumber}</p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
-                                aria-label="닫기"
-                            >
-                                <X size={16} />
-                            </button>
+                            <ModalCloseButton onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }} />
                         </div>
-                        <div className="px-5 py-4 space-y-3">
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-slate-600">신청시각</label>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                            <div>
+                                <label className={labelClass}>신청시각</label>
                                 <input
                                     type="datetime-local"
                                     value={manualRemittanceForm.appliedAt}
                                     onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, appliedAt: event.target.value }))}
-                                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    className={fieldClass()}
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-slate-600">총 송금액 (USD)</label>
+                                <div>
+                                    <label className={labelClass}>총 송금액 (USD)</label>
                                     <input
                                         type="text"
                                         inputMode="decimal"
-                                        placeholder="1050"
+                                        placeholder="예: 1050"
                                         value={manualRemittanceForm.finalReceiveAmountUsd}
                                         onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, finalReceiveAmountUsd: event.target.value }))}
-                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                        className={fieldClass()}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-slate-600">환율 (1 USD =)</label>
+                                <div>
+                                    <label className={labelClass}>환율 (1 USD =)</label>
                                     <input
                                         type="text"
                                         inputMode="decimal"
-                                        placeholder="1481.8829"
+                                        placeholder="예: 1481.8829"
                                         value={manualRemittanceForm.exchangeRate}
                                         onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, exchangeRate: event.target.value }))}
-                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                        className={fieldClass()}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-slate-600">총 송금 한화 (KRW)</label>
+                                <div>
+                                    <label className={labelClass}>총 송금 한화 (KRW)</label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
-                                        placeholder="1590589"
+                                        placeholder="예: 1590589"
                                         value={manualRemittanceForm.sendAmountKrw}
                                         onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, sendAmountKrw: event.target.value }))}
-                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                        className={fieldClass()}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-slate-600">총 수수료 (KRW)</label>
+                                <div>
+                                    <label className={labelClass}>총 수수료 (KRW)</label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
-                                        placeholder="34612"
+                                        placeholder="예: 34612"
                                         value={manualRemittanceForm.totalFeeKrw}
                                         onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, totalFeeKrw: event.target.value }))}
-                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                        className={fieldClass()}
                                     />
                                 </div>
                             </div>
@@ -7276,6 +7299,7 @@ export default function WormOrderPage() {
                         </div>
                     </div>
                 </div>
+                </Modal>
             )}
 
                 </div>
