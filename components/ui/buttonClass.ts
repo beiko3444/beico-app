@@ -2,7 +2,7 @@
 import { twMerge } from 'tailwind-merge'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'dangerGhost'
-export type ButtonSize = 'sm' | 'md' | 'icon' | 'iconMd'
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon' | 'iconMd'
 
 const base =
   'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap font-bold transition-colors [&>svg]:shrink-0 ' +
@@ -22,6 +22,8 @@ const variants: Record<ButtonVariant, string> = {
 const sizes: Record<ButtonSize, string> = {
   sm: 'h-8 rounded-lg px-3 text-xs',
   md: 'h-10 rounded-lg px-4 text-sm',
+  // Full-width touch targets on public and partner screens.
+  lg: 'h-12 rounded-lg px-5 text-[15px]',
   // Icon-only buttons: square, no padding, so the 16px icon keeps its size.
   icon: 'h-8 w-8 rounded-lg p-0',
   iconMd: 'h-9 w-9 rounded-lg p-0',
